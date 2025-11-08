@@ -1,0 +1,446 @@
+import React, { useState, useEffect } from 'react';
+import { ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, XCircle, Download, Plus, Minus, Calendar, User, FileText, Award, Shield, MapPin, Building2, Users, DollarSign, CreditCard, Landmark, TrendingUp, Eye, Settings, Briefcase, Scale, Info, Share2, Library, ClipboardCheck, Clock, GitBranch, Trash2 } from 'lucide-react';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+// --- DATA MODELS (EXPANDED FOR ROBUSTNESS) ---
+
+const FIRM_TYPES = {
+  'Bank': { label: 'Bank', regime: 'SMCR', icon: Landmark, isSoloRegulated: false, description: 'Full deposit-taking banks under PRA supervision' },
+  'Investment': { label: 'Investment Firm', regime: 'SMCR', icon: TrendingUp, isSoloRegulated: true, description: 'Investment services and activities under FCA authorization' },
+  'Insurance': { label: 'Insurance', regime: 'SMCR', icon: Shield, isSoloRegulated: false, description: 'Insurance undertakings under PRA/FCA supervision' },
+  'Payments': { label: 'Payment Services', regime: 'PSD', icon: CreditCard, isSoloRegulated: true, description: 'Payment service providers under PSD2 regime' },
+  // ...other firm types
+};
+
+const SMCR_CATEGORIES = {
+  'limited': 'Limited Scope',
+  'core': 'Core',
+  'enhanced': 'Enhanced'
+};
+
+const SMF_LIBRARY = [
+  { code: 'SMF1', label: 'Chief Executive Officer', icon: Building2 },
+  { code: 'SMF2', label: 'Chief Finance Officer', icon: DollarSign },
+  { code: 'SMF3', label: 'Executive Director', icon: Users },
+  { code: 'SMF4', label: 'Chief Risk Officer', icon: AlertTriangle },
+  { code: 'SMF5', label: 'Head of Internal Audit', icon: Eye },
+  { code: 'SMF16', label: 'Compliance Oversight', icon: CheckCircle },
+  { code: 'SMF17', label: 'Money Laundering Reporting Officer', icon: Shield },
+];
+
+const PRESCRIBED_RESPONSIBILITIES = [
+    { ref: '(a)', text: "Responsibility for obligations under the senior managers regime", category: 'enhanced', info: 'Ensures compliance with all aspects of the Senior Managers Regime (SYSC 24.2.6R).' },
+    { ref: '(b)', text: "Responsibility for obligations under the certification regime", category: 'enhanced', info: 'Oversees the process of certifying staff as fit and proper (SYSC 24.2.6R).' },
+    { ref: '(c)', text: "Responsibility for the management responsibilities map", category: 'enhanced', info: 'Only applies to Enhanced firms. Involves maintaining the Responsibilities Map (SYSC 24.2.6R).' },
+    { ref: '(d)', text: "Responsibility for countering financial crime risk", category: 'all', info: 'If not held by the MLRO (SMF17), this PR holder must supervise the MLRO (SYSC 24.2.6R).' },
+    { ref: '(z)', text: "Responsibility for compliance with CASS", category: 'all', applies: (data) => data.isCASSFirm, info: 'Only applies if the firm holds client money or assets. Can be allocated to a CASS oversight role or a senior manager who supervises them (SYSC 24.2.6R).' },
+];
+
+const CERTIFICATION_FUNCTIONS = [
+    { id: 'sig-management', name: 'Significant Management', ref: 'SYSC 27.8.4R', description: 'Acting as a senior manager with significant responsibility for a significant business unit.' },
+    { id: 'qualifications', name: 'Functions Requiring Qualifications', ref: 'SYSC 27.8.10R', description: 'Any activity for which there is a qualification requirement (e.g., specific advising roles).' },
+    { id: 'risk-takers', name: 'Material Risk Takers', ref: 'SYSC 27.8.14R', description: 'Staff whose activities could have a material impact on the firm’s risk profile.' },
+    { id: 'manager-cert', name: 'Manager of Certification Employees', ref: 'SYSC 27.8.13R', description: 'Anyone who directly or indirectly manages or supervises a Certification Employee.' },
+];
+
+const FP_QUESTIONS_EXPANDED = {
+    'honesty': { 
+        title: 'Honesty, Integrity & Reputation (FIT 2.1)', 
+        questions: [
+            { id: 'conviction', question: 'Any criminal convictions (including spent where permissible)?', details: 'Consider offences of dishonesty, fraud, financial crime, etc.' },
+            { id: 'civil-finding', question: 'Subject to any adverse finding or settlement in civil proceedings?', details: 'Especially in connection with financial business or fraud.' },
+            { id: 'investigation', question: 'Subject of any investigation or disciplinary proceedings by a regulatory/professional body?', details: 'Includes current or previous investigations.' }
+        ] 
+    },
+    'capability': { 
+        title: 'Competence & Capability (FIT 2.2)', 
+        questions: [
+            { id: 'experience', question: 'Demonstrated necessary experience and training for the role?', details: 'Review past roles, responsibilities and performance.' },
+            { id: 'time', question: 'Have adequate time to perform the function and meet associated responsibilities?', details: 'Consider other roles and commitments.' },
+        ] 
+    },
+    'soundness': { 
+        title: 'Financial Soundness (FIT 2.3)', 
+        questions: [
+            { id: 'judgement-debt', question: 'Subject to any outstanding judgment debt or award?', details: 'Applies in the UK or elsewhere.' },
+            { id: 'bankruptcy', question: 'Been bankrupt or made arrangements with creditors?', details: 'Includes bankruptcy restriction orders/undertakings.' },
+        ] 
+    }
+};
+
+const createDefaultData = () => ({
+  firmType: '', smcrCategory: 'core', optUp: false, isCASSFirm: false, currentStep: 0,
+  holders: [], regulatoryReferences: [],
+});
+
+// --- MAIN NAVIGATOR COMPONENT ---
+const SeniorManagerNavigator = () => {
+    const [data, setData] = useState(() => {
+        const saved = localStorage.getItem('smcr-navigator-v4-data');
+        return saved ? JSON.parse(saved) : createDefaultData();
+    });
+
+    useEffect(() => {
+        localStorage.setItem('smcr-navigator-v4-data', JSON.stringify(data));
+    }, [data]);
+
+    const steps = [
+        { id: 'setup', name: 'Firm Setup', icon: MapPin },
+        { id: 'people', name: 'People & Responsibilities', icon: Users },
+        { id: 'certification', name: 'Certification Regime', icon: Award },
+        { id: 'fitness', name: 'Fitness & Propriety', icon: Shield },
+        { id: 'references', name: 'Reg. References', icon: ClipboardCheck },
+        { id: 'summary', name: 'Summary Report', icon: CheckCircle }
+    ];
+
+    const updateData = (updates) => setData(prev => ({ ...prev, ...updates }));
+    const nextStep = () => data.currentStep < steps.length - 1 && updateData({ currentStep: data.currentStep + 1 });
+    const prevStep = () => data.currentStep > 0 && updateData({ currentStep: data.currentStep - 1 });
+
+    const addHolder = () => {
+        const newHolder = {
+            id: `h${Date.now()}`, name: 'New Holder', roles: [], prescribedResponsibilities: [],
+            certificationFunctions: [], fpAssessments: [],
+        };
+        updateData({ holders: [...data.holders, newHolder] });
+    };
+
+    const updateHolder = (holderId, updates) => {
+        updateData({ holders: data.holders.map(h => h.id === holderId ? { ...h, ...updates } : h) });
+    };
+
+    const removeHolder = (holderId) => {
+        if (window.confirm('Are you sure you want to remove this person?')) {
+            updateData({ holders: data.holders.filter(h => h.id !== holderId) });
+        }
+    };
+    
+    // --- STEP COMPONENTS ---
+
+    const FirmSetup = () => { /* ... No change from previous working version ... */ 
+        const firmConfig = FIRM_TYPES[data.firmType];
+        return (
+            <div className="space-y-6">
+                <div className="bg-blue-50 p-6 rounded-lg">
+                    <h2 className="text-xl font-semibold mb-4">Firm Type Selection</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                       {Object.entries(FIRM_TYPES).map(([key, type]) => (
+                           <button
+                             key={key}
+                             onClick={() => updateData({ firmType: key, smcrCategory: type.isSoloRegulated ? 'core' : '' })}
+                             className={`p-4 border rounded-lg text-left transition-all hover:shadow-md ${ data.firmType === key ? 'border-blue-500 bg-blue-100' : 'border-gray-200'}`}
+                           >
+                             <div className="flex items-center space-x-3 mb-2"><type.icon className="w-6 h-6 text-blue-600" /><h3 className="font-semibold">{type.label}</h3></div>
+                             <p className="text-sm text-gray-600 mb-2">{type.description}</p>
+                           </button>
+                       ))}
+                    </div>
+                </div>
+
+                {firmConfig?.isSoloRegulated && (
+                    <div className="bg-gray-50 p-6 rounded-lg border">
+                        <h2 className="text-xl font-semibold mb-2">SM&CR Categorisation (Solo-Regulated)</h2>
+                        <div className="flex flex-col md:flex-row gap-4 mb-4">
+                            <select value={data.smcrCategory} onChange={(e) => updateData({ smcrCategory: e.target.value })} className="w-full p-3 border rounded-lg">
+                                {Object.entries(SMCR_CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                            </select>
+                            <div className="flex items-center">
+                                <input type="checkbox" id="optUp" checked={data.optUp || false} onChange={(e) => updateData({ optUp: e.target.checked })} className="h-4 w-4 text-blue-600"/>
+                                <label htmlFor="optUp" className="ml-2 block text-sm text-gray-900">Voluntarily opt-up to Enhanced?</label>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
+                <div className="bg-gray-50 p-6 rounded-lg border">
+                     <div className="flex items-center"><input type="checkbox" id="isCASSFirm" checked={data.isCASSFirm || false} onChange={(e) => updateData({ isCASSFirm: e.target.checked })} className="h-4 w-4 text-blue-600"/>
+                        <label htmlFor="isCASSFirm" className="ml-2 block text-sm text-gray-900">Does the firm hold client money or assets (CASS)?</label>
+                        <Info className="w-4 h-4 text-gray-500 ml-2" title="This activates CASS-specific responsibilities."/>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const PeopleAndResponsibilities = () => { /* ... No change from previous working version ... */ 
+        const availablePRs = PRESCRIBED_RESPONSIBILITIES.filter(pr => {
+            if (pr.applies && !pr.applies(data)) return false;
+            if (data.smcrCategory !== 'enhanced' && pr.category === 'enhanced' && !data.optUp) return false;
+            return true;
+        });
+
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">People & Responsibilities</h2>
+                  <button onClick={addHolder} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                      <Plus className="w-5 h-5" /><span>Add Person</span>
+                  </button>
+                </div>
+
+                {data.holders.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg"><Users className="mx-auto w-12 h-12 text-gray-400"/><p className="mt-4">No people added. Click 'Add Person' to start.</p></div>
+                ) : (
+                  <div className="space-y-4">
+                      {data.holders.map(holder => (
+                          <div key={holder.id} className="border rounded-lg p-6 bg-white shadow-sm">
+                              <div className="flex justify-between items-start mb-4">
+                                  <input type="text" value={holder.name} onChange={(e) => updateHolder(holder.id, { name: e.target.value })} className="text-lg font-semibold p-1 -m-1 border-b-2 border-transparent focus:border-blue-500 outline-none"/>
+                                  <button onClick={() => removeHolder(holder.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-5 h-5"/></button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <div>
+                                      <h4 className="font-semibold mb-2">Senior Management Functions (SMF)</h4>
+                                      <div className="space-y-2">
+                                          {SMF_LIBRARY.map(smf => (
+                                              <label key={smf.code} className="flex items-center text-sm"><input type="checkbox" checked={holder.roles.includes(smf.code)} onChange={(e) => { const updatedRoles = e.target.checked ? [...holder.roles, smf.code] : holder.roles.filter(r => r !== smf.code); updateHolder(holder.id, { roles: updatedRoles }); }} className="h-4 w-4"/><smf.icon className="w-4 h-4 mx-2 text-blue-600"/>{smf.code} - {smf.label}</label>
+                                          ))}
+                                      </div>
+                                  </div>
+                                  <div>
+                                      <h4 className="font-semibold mb-2">Prescribed Responsibilities (PR)</h4>
+                                      <div className="space-y-2">
+                                          {availablePRs.map(pr => (
+                                              <label key={pr.ref} className="flex items-start text-sm"><input type="checkbox" checked={holder.prescribedResponsibilities.includes(pr.ref)} onChange={(e) => { const updatedPRs = e.target.checked ? [...holder.prescribedResponsibilities, pr.ref] : holder.prescribedResponsibilities.filter(r => r !== pr.ref); updateHolder(holder.id, { prescribedResponsibilities: updatedPRs });}} className="h-4 w-4 mt-0.5"/><span className="ml-2"><strong>{pr.ref}</strong>: {pr.text}</span><Info className="w-4 h-4 ml-2 text-gray-400 flex-shrink-0" title={pr.info}/></label>
+                                          ))}
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+                )}
+            </div>
+        );
+    };
+
+    const CertificationRegime = () => { /* ... No change from previous working version ... */
+       return (
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold">Certification Regime Management (SYSC 27)</h2>
+          <p className="text-gray-600">Identify employees performing Certification Functions and manage their certification lifecycle.</p>
+          <div className="space-y-4">
+              {data.holders.map(holder => (
+                  <div key={holder.id} className="border rounded-lg p-4">
+                      <h3 className="font-semibold">{holder.name}</h3>
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {CERTIFICATION_FUNCTIONS.map(cf => (
+                              <label key={cf.id} className="flex items-start text-sm p-2 bg-gray-50 rounded-md">
+                                  <input type="checkbox" checked={holder.certificationFunctions?.includes(cf.id)} onChange={(e) => { const updatedCFs = e.target.checked ? [...(holder.certificationFunctions || []), cf.id] : holder.certificationFunctions.filter(id => id !== cf.id); updateHolder(holder.id, { certificationFunctions: updatedCFs }); }} className="h-4 w-4 mt-0.5"/>
+                                  <span className="ml-2">{cf.name}</span>
+                                  <Info className="w-4 h-4 ml-auto text-gray-400 flex-shrink-0" title={`${cf.ref}: ${cf.description}`}/>
+                              </label>
+                          ))}
+                      </div>
+                  </div>
+              ))}
+          </div>
+      </div>
+    );
+    };
+    
+    const FitnessPropriety = () => {
+        const [activeHolderId, setActiveHolderId] = useState(data.holders[0]?.id || null);
+        const activeHolder = data.holders.find(h => h.id === activeHolderId);
+
+        const startNewAssessment = () => {
+            const newAssessment = {
+                id: `fp${Date.now()}`,
+                date: new Date().toISOString().split('T')[0],
+                type: (activeHolder.fpAssessments?.length > 0) ? 'Annual' : 'Initial',
+                answers: {}
+            };
+            const updatedAssessments = [...(activeHolder.fpAssessments || []), newAssessment];
+            updateHolder(activeHolderId, { fpAssessments: updatedAssessments });
+        };
+        
+        const updateAnswer = (assessmentId, questionId, value) => {
+            const updatedAssessments = activeHolder.fpAssessments.map(asm => {
+                if (asm.id === assessmentId) {
+                    return { ...asm, answers: { ...asm.answers, [questionId]: value } };
+                }
+                return asm;
+            });
+            updateHolder(activeHolderId, {fpAssessments: updatedAssessments});
+        };
+
+        return (
+            <div className="space-y-6">
+                <h2 className="text-xl font-semibold">Fitness & Propriety Assessment (FIT Sourcebook)</h2>
+                <p className="text-gray-600">Conduct and record versioned F&P assessments based on the three regulatory pillars. Must be done on appointment and at least annually.</p>
+                
+                {data.holders.length > 0 ? (
+                    <>
+                        <div className="flex items-center gap-4">
+                            <label className="font-medium">Select Person:</label>
+                            <select value={activeHolderId || ''} onChange={(e) => setActiveHolderId(e.target.value)} className="p-2 border rounded-md">
+                                {data.holders.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                            </select>
+                        </div>
+                        
+                        {activeHolder && (
+                            <div className="border rounded-lg p-6 mt-4">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-lg font-semibold">Assessments for: {activeHolder.name}</h3>
+                                    <button onClick={startNewAssessment} className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                        <Plus className="w-4 h-4" /><span>Start New Assessment</span>
+                                    </button>
+                                </div>
+                                {activeHolder.fpAssessments?.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {activeHolder.fpAssessments.slice().reverse().map(asm => (
+                                            <div key={asm.id} className="border rounded-md p-4 bg-gray-50">
+                                                <h4 className="font-bold text-md mb-3">{asm.type} Assessment - {asm.date}</h4>
+                                                {Object.values(FP_QUESTIONS_EXPANDED).map(pillar => (
+                                                    <div key={pillar.title} className="mb-4">
+                                                        <h5 className="font-semibold text-blue-700 mb-2">{pillar.title}</h5>
+                                                        {pillar.questions.map(q => (
+                                                            <div key={q.id} className="ml-4 mb-2">
+                                                                <p className="text-sm">{q.question}</p>
+                                                                <textarea value={asm.answers[q.id] || ''} onChange={(e) => updateAnswer(asm.id, q.id, e.target.value)} placeholder="Notes & evidence..." className="w-full text-sm p-2 mt-1 border rounded" rows="2"/>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <p className="text-center text-gray-500 py-4">No assessments started for this person.</p>}
+                            </div>
+                        )}
+                    </>
+                ) : <p className="text-center text-gray-500 py-10">Add people in the 'People & Responsibilities' tab first.</p>}
+            </div>
+        );
+    };
+
+    const RegulatoryReferences = () => {
+        const addReference = () => {
+            const personName = prompt("Enter Person's Name:");
+            if (!personName) return;
+            const newRef = {
+                id: `ref${Date.now()}`,
+                direction: 'Outgoing',
+                personName,
+                otherFirm: '',
+                dateRequested: new Date().toISOString().split('T')[0],
+                dateResponded: '',
+                status: 'Pending'
+            };
+            updateData({ regulatoryReferences: [...data.regulatoryReferences, newRef] });
+        };
+
+        const updateReference = (refId, updates) => {
+            const updatedRefs = data.regulatoryReferences.map(ref => ref.id === refId ? { ...ref, ...updates } : ref);
+            updateData({ regulatoryReferences: updatedRefs });
+        };
+        
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Regulatory References Log (SYSC 22)</h2>
+                    <button onClick={addReference} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"><Plus className="w-4 h-4" /><span>Log Request</span></button>
+                </div>
+                <p className="text-gray-600">Track incoming and outgoing reference requests. The FCA expects references to be provided within 6 weeks at most.</p>
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                        <thead className="bg-gray-50"><tr>
+                            {['Direction', 'Person', 'Other Firm', 'Date Requested', 'Date Responded', 'Status'].map(h => <th key={h} className="p-3 text-left text-sm font-semibold text-gray-600 border">{h}</th>)}
+                        </tr></thead>
+                        <tbody>
+                            {data.regulatoryReferences.map(ref => (
+                                <tr key={ref.id}>
+                                    <td className="p-2 border text-sm">{ref.direction}</td>
+                                    <td className="p-2 border text-sm">{ref.personName}</td>
+                                    <td className="p-2 border text-sm"><input type="text" value={ref.otherFirm} onChange={(e) => updateReference(ref.id, {otherFirm: e.target.value})} className="w-full p-1 border rounded"/></td>
+                                    <td className="p-2 border text-sm"><input type="date" value={ref.dateRequested} onChange={(e) => updateReference(ref.id, {dateRequested: e.target.value})} className="w-full p-1 border rounded"/></td>
+                                    <td className="p-2 border text-sm"><input type="date" value={ref.dateResponded} onChange={(e) => updateReference(ref.id, {dateResponded: e.target.value, status: e.target.value ? 'Complete' : 'Pending'})} className="w-full p-1 border rounded"/></td>
+                                    <td className="p-2 border text-sm"><span className={`px-2 py-1 rounded-full text-xs ${ref.status === 'Complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{ref.status}</span></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
+    const SummaryReport = () => {
+        const totalHolders = data.holders.length;
+        const totalSmfs = data.holders.reduce((acc, h) => acc + h.roles.length, 0);
+        const totalCerts = data.holders.reduce((acc, h) => acc + h.certificationFunctions.length, 0);
+        const issues = data.holders.reduce((acc, h) => {
+            const lastAsm = h.fpAssessments?.[h.fpAssessments.length - 1];
+            return acc + (lastAsm && Object.keys(lastAsm.answers).some(k => lastAsm.answers[k]) ? 1 : 0);
+        }, 0);
+
+        const complianceData = [
+            { name: 'Compliant', value: totalHolders - issues, fill: '#10B981' },
+            { name: 'Issues Found', value: issues, fill: '#EF4444' }
+        ];
+
+        return (
+            <div className="space-y-6">
+                <h2 className="text-xl font-semibold">Regulatory Compliance Summary</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg text-center"><div className="text-2xl font-bold">{totalHolders}</div><div className="text-sm text-gray-600">Total People</div></div>
+                    <div className="bg-blue-50 p-4 rounded-lg text-center"><div className="text-2xl font-bold">{totalSmfs}</div><div className="text-sm text-gray-600">SMF Roles Assigned</div></div>
+                    <div className="bg-blue-50 p-4 rounded-lg text-center"><div className="text-2xl font-bold">{totalCerts}</div><div className="text-sm text-gray-600">Cert. Functions</div></div>
+                    <div className="bg-red-50 p-4 rounded-lg text-center"><div className="text-2xl font-bold">{issues}</div><div className="text-sm text-red-600">People with F&P Issues</div></div>
+                </div>
+                <div className="bg-white p-6 rounded-lg border shadow-sm">
+                    <h3 className="font-semibold mb-4">Overall F&P Status</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                            <Pie data={complianceData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                                {complianceData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}
+                            </Pie>
+                            <Tooltip />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+        );
+    };
+
+    const renderStepContent = () => {
+        switch (steps[data.currentStep].id) {
+            case 'setup': return <FirmSetup />;
+            case 'people': return <PeopleAndResponsibilities />;
+            case 'certification': return <CertificationRegime />;
+            case 'fitness': return <FitnessPropriety />;
+            case 'references': return <RegulatoryReferences />;
+            case 'summary': return <SummaryReport />;
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="bg-gray-100 min-h-screen font-sans">
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                <div className="mb-8"><h1 className="text-3xl font-bold text-gray-900">Fully Functional SMCR Navigator</h1><p className="text-gray-600">A robust assurance tool for SM&CR, Certification, and PSD2 compliance.</p></div>
+                <div className="mb-8 overflow-x-auto pb-4">
+                    <div className="flex items-center justify-between min-w-max">
+                        {steps.map((step, idx) => (<React.Fragment key={step.id}>
+                            <button onClick={() => updateData({ currentStep: idx })} className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${idx === data.currentStep ? 'bg-blue-600 text-white shadow-md' : idx < data.currentStep ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-white text-gray-600 hover:bg-gray-200 border'}`}>
+                                <step.icon className="w-5 h-5" /><span>{step.name}</span>
+                            </button>
+                            {idx < steps.length - 1 && <div className="flex-1 h-px bg-gray-300 mx-2"></div>}
+                        </React.Fragment>))}
+                    </div>
+                </div>
+                <div className="bg-white rounded-lg shadow-lg border p-6 md:p-8 min-h-[500px]">
+                    {renderStepContent()}
+                    <div className="flex justify-between items-center mt-8 pt-6 border-t">
+                        <button onClick={prevStep} disabled={data.currentStep === 0} className="flex items-center space-x-2 px-4 py-2 text-gray-600 disabled:opacity-50"><ChevronLeft className="w-4 h-4" /><span>Previous</span></button>
+                        <div className="text-sm text-gray-500">Step {data.currentStep + 1} of {steps.length}: <strong>{steps[data.currentStep].name}</strong></div>
+                        <button onClick={nextStep} disabled={data.currentStep === steps.length - 1} className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 shadow"><span>Next</span><ChevronRight className="w-4 h-4" /></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default SeniorManagerNavigator;

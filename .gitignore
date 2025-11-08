@@ -1,0 +1,21 @@
+# dependencies
+smcr-app/node_modules
+
+# builds
+smcr-app/.next
+smcr-app/out
+smcr-app/build
+
+# env
+.env
+smcr-app/.env
+smcr-app/.env.local
+smcr-app/.env*.local
+
+# misc
+.DS_Store
+smcr-app/.vercel
+smcr-app/next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
