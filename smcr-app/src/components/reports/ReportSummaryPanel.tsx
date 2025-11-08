@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { REPORT_INSIGHTS, SAMPLE_BAR } from "@/lib/smcr-data";
+import { CheckCircle2, AlertTriangle, Award } from "lucide-react";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 
 const PIE_COLORS = ["#3CCB8B", "#7F5AF0"];
@@ -10,15 +10,44 @@ const PIE_COLORS = ["#3CCB8B", "#7F5AF0"];
 export function ReportSummaryPanel() {
   const [mounted, setMounted] = useState(false);
   const coverage = useSmcrStore((state) => state.getResponsibilityCoverage());
+  const individuals = useSmcrStore((state) => state.individuals);
+  const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
+  const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
+  const responsibilityAssignments = useSmcrStore((state) => state.responsibilityAssignments);
+
+  // Calculate dynamic metrics
+  const assignedCount = useMemo(() => Object.values(responsibilityAssignments).filter(Boolean).length, [responsibilityAssignments]);
+  const ownedCount = useMemo(() => Object.values(responsibilityOwners).filter((id) => id).length, [responsibilityOwners]);
+  const unassignedCount = assignedCount - ownedCount;
+
+  const expectedFitnessResponses = individuals.length * 3; // 3 key FIT sections per individual
+  const outstandingFitness = Math.max(0, expectedFitnessResponses - fitnessResponses.length);
 
   const insights = useMemo(
-    () =>
-      REPORT_INSIGHTS.map((insight) =>
-        insight.label === "Responsibilities coverage"
-          ? { ...insight, value: `${coverage}%` }
-          : insight
-      ),
-    [coverage]
+    () => [
+      {
+        label: "Responsibilities coverage",
+        value: coverage > 0 ? `${coverage}%` : "–",
+        subLabel: assignedCount > 0 ? `${assignedCount} prescribed responsibilities` : "No responsibilities assigned",
+        icon: CheckCircle2,
+        tone: "positive" as const,
+      },
+      {
+        label: "Outstanding assignments",
+        value: unassignedCount > 0 ? unassignedCount.toString() : "–",
+        subLabel: unassignedCount > 0 ? "Responsibilities need owners" : "All assigned",
+        icon: AlertTriangle,
+        tone: unassignedCount > 0 ? ("warning" as const) : ("positive" as const),
+      },
+      {
+        label: "FIT assessments",
+        value: outstandingFitness > 0 ? outstandingFitness.toString() : individuals.length > 0 ? "Complete" : "–",
+        subLabel: individuals.length > 0 ? `${individuals.length} individuals` : "No individuals added",
+        icon: Award,
+        tone: outstandingFitness === 0 && individuals.length > 0 ? ("positive" as const) : ("warning" as const),
+      },
+    ],
+    [coverage, assignedCount, unassignedCount, outstandingFitness, individuals.length]
   );
 
   const pieData = useMemo(
@@ -29,6 +58,28 @@ export function ReportSummaryPanel() {
     [coverage]
   );
 
+  // Generate bar chart data from real individuals
+  const certificationData = useMemo(() => {
+    if (individuals.length === 0) {
+      return [];
+    }
+
+    return individuals.map((individual) => {
+      // Count how many responsibilities this individual owns
+      const ownedResponsibilities = Object.values(responsibilityOwners).filter((id) => id === individual.id).length;
+
+      // Count fitness responses for this individual (simplified - assuming 3 sections per individual)
+      const individualResponses = fitnessResponses.filter((r) => r.questionId.includes(individual.id)).length;
+      const completionPercentage = individualResponses >= 3 ? 100 : Math.round((individualResponses / 3) * 100);
+
+      return {
+        name: individual.smfRole || individual.name.substring(0, 8),
+        complete: completionPercentage,
+        outstanding: 100 - completionPercentage,
+      };
+    });
+  }, [individuals, responsibilityOwners, fitnessResponses]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -38,7 +89,7 @@ export function ReportSummaryPanel() {
       <div>
         <p className="text-xs uppercase tracking-[0.4em] text-emerald">live preview</p>
         <h3 className="text-2xl">Report outputs</h3>
-        <p className="text-sm text-sand/70">Push to MEMA vulnerability + FCA fines tools when ready.</p>
+        <p className="text-sm text-sand/70">Real-time metrics from your SMCR journey progress.</p>
       </div>
 
       <div className="space-y-4">
@@ -82,11 +133,17 @@ export function ReportSummaryPanel() {
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <p className="text-sm text-sand/70 mb-2">Certification readiness</p>
+        <p className="text-sm text-sand/70 mb-2">Certification readiness by individual</p>
         <div className="h-48">
-          {mounted ? (
+          {!mounted ? (
+            <div className="h-full w-full animate-pulse rounded-2xl bg-white/10" />
+          ) : certificationData.length === 0 ? (
+            <div className="h-full w-full flex items-center justify-center">
+              <p className="text-sm text-sand/50">Add SMF individuals to see certification progress</p>
+            </div>
+          ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={SAMPLE_BAR}>
+              <BarChart data={certificationData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff22" />
                 <XAxis dataKey="name" stroke="#E3E8EE" />
                 <YAxis stroke="#E3E8EE" />
@@ -95,8 +152,6 @@ export function ReportSummaryPanel() {
                 <Bar dataKey="outstanding" stackId="a" fill="#7F5AF0" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="h-full w-full animate-pulse rounded-2xl bg-white/10" />
           )}
         </div>
       </div>

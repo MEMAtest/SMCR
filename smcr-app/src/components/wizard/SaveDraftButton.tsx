@@ -1,48 +1,48 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { CheckCircle2, Loader2, Save, ShieldAlert } from "lucide-react";
 import { useSmcrStore } from "@/stores/useSmcrStore";
+import { saveDraft } from "@/lib/services/draftService";
 
 export function SaveDraftButton() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
-  const assignments = useSmcrStore((state) => state.responsibilityAssignments);
+  const responsibilityAssignments = useSmcrStore((state) => state.responsibilityAssignments);
+  const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
+  const individuals = useSmcrStore((state) => state.individuals);
+  const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
+  const draftId = useSmcrStore((state) => state.draftId);
+  const setDraftId = useSmcrStore((state) => state.setDraftId);
+
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState<string>("");
-
-  const responsibilityRefs = useMemo(
-    () =>
-      Object.entries(assignments)
-        .filter(([, value]) => value)
-        .map(([ref]) => ref),
-    [assignments]
-  );
 
   const disabled = !firmProfile.firmName || !firmProfile.firmType || status === "saving";
 
   const handleSave = async () => {
     setStatus("saving");
     setMessage("");
-    try {
-      const response = await fetch("/api/firms", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ firmProfile, responsibilityRefs }),
-      });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({ error: "" }));
-        throw new Error(data.error || "Unable to save draft");
-      }
+    const result = await saveDraft(
+      {
+        firmProfile,
+        responsibilityAssignments,
+        responsibilityOwners,
+        individuals,
+        fitnessResponses,
+      },
+      draftId
+    );
 
-      const data = await response.json();
+    if (result.success && result.draftId) {
       setStatus("success");
-      setMessage(`Draft saved (#${data.id.slice(0, 8)})`);
-    } catch (error) {
+      setMessage(`Draft saved (#${result.draftId.slice(0, 8)})`);
+      if (!draftId) {
+        setDraftId(result.draftId);
+      }
+    } else {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Unable to save draft");
+      setMessage(result.error || "Unable to save draft");
     }
   };
 
@@ -51,7 +51,7 @@ export function SaveDraftButton() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-emerald">save state</p>
-          <h3 className="text-2xl">Neon draft snapshot</h3>
+          <h3 className="text-2xl">Save draft snapshot</h3>
         </div>
         {status === "success" ? (
           <CheckCircle2 className="size-6 text-emerald" />
@@ -62,7 +62,7 @@ export function SaveDraftButton() {
         )}
       </div>
       <p className="text-sm text-sand/70">
-        Stores the firm profile plus assigned responsibilities to Neon so you can resume work later.
+        Stores the firm profile plus assigned responsibilities to secure draft storage for later access.
       </p>
       <button
         type="button"
@@ -73,7 +73,7 @@ export function SaveDraftButton() {
         }`}
       >
         {status === "saving" && <Loader2 className="size-4 animate-spin" />}
-        Save to Neon
+        Save Draft
       </button>
       {message && (
         <p

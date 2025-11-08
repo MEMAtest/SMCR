@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { firms, responsibilities } from "@/lib/schema";
+import { firms, responsibilities, individuals, fitnessAssessments } from "@/lib/schema";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
+import type { Individual, FitnessResponse } from "@/lib/validation";
 
 const responsibilityMap = new Map(
   PRESCRIBED_RESPONSIBILITIES.map((item) => [item.ref, item.text])
@@ -17,6 +19,9 @@ type FirmPayload = {
     optUp?: boolean;
   };
   responsibilityRefs: string[];
+  responsibilityOwners?: Record<string, string>;
+  individuals?: Individual[];
+  fitnessResponses?: FitnessResponse[];
 };
 
 export async function POST(request: Request) {
@@ -29,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const { firmProfile, responsibilityRefs } = payload;
+  const { firmProfile, responsibilityRefs, responsibilityOwners, individuals: indivs, fitnessResponses } = payload;
 
   if (!firmProfile?.firmName || !firmProfile?.firmType) {
     return NextResponse.json(
@@ -39,6 +44,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Insert firm
     const [record] = await db
       .insert(firms)
       .values({
@@ -53,14 +59,29 @@ export async function POST(request: Request) {
       })
       .returning({ id: firms.id });
 
-    if (record?.id && responsibilityRefs?.length) {
+    const firmId = record.id;
+
+    // Insert individuals (SMFs)
+    if (indivs && indivs.length > 0) {
+      const individualRows = indivs.map((ind) => ({
+        firmId,
+        fullName: ind.name,
+        smfRole: ind.smfRole,
+        email: ind.email || null,
+      }));
+      await db.insert(individuals).values(individualRows);
+    }
+
+    // Insert responsibilities with ownership
+    if (responsibilityRefs?.length) {
       const rows = responsibilityRefs
         .filter((ref) => responsibilityMap.has(ref))
         .map((ref) => ({
-          firmId: record.id,
+          firmId,
           reference: ref,
           title: responsibilityMap.get(ref) ?? ref,
           status: "assigned",
+          ownerId: responsibilityOwners?.[ref] || null,
         }));
 
       if (rows.length) {
@@ -68,11 +89,47 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ id: record.id }, { status: 201 });
+    // Insert fitness assessments
+    if (fitnessResponses && fitnessResponses.length > 0) {
+      const fitnessRows = fitnessResponses.map((resp) => ({
+        individualId: resp.questionId.split("-")[0], // Extract individual ID from questionId
+        fitSection: resp.sectionId,
+        response: resp.response,
+        evidenceLinks: resp.evidence ? [resp.evidence] : [],
+      }));
+      await db.insert(fitnessAssessments).values(fitnessRows);
+    }
+
+    return NextResponse.json({ id: firmId }, { status: 201 });
   } catch (error) {
     console.error("Failed to save firm", error);
     return NextResponse.json(
       { error: "Failed to save firm profile" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET /api/firms - List all firms (simplified, no auth yet)
+ */
+export async function GET() {
+  const db = getDb();
+
+  try {
+    const allFirms = await db.select().from(firms).orderBy(firms.createdAt);
+
+    return NextResponse.json({
+      drafts: allFirms.map((f) => ({
+        id: f.id,
+        firmName: f.name,
+        updatedAt: f.createdAt?.toISOString() || new Date().toISOString(),
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to list firms", error);
+    return NextResponse.json(
+      { error: "Failed to list drafts" },
       { status: 500 }
     );
   }

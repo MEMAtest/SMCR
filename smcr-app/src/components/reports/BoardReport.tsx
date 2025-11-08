@@ -1,0 +1,273 @@
+"use client";
+
+import { useSmcrStore } from "@/stores/useSmcrStore";
+import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
+import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield } from "lucide-react";
+import { useMemo } from "react";
+
+export function BoardReport() {
+  const firmProfile = useSmcrStore((state) => state.firmProfile);
+  const individuals = useSmcrStore((state) => state.individuals);
+  const responsibilityAssignments = useSmcrStore((state) => state.responsibilityAssignments);
+  const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
+  const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
+  const validateStep = useSmcrStore((state) => state.validateStep);
+
+  // Calculate completeness
+  const firmValidation = validateStep("firm");
+  const respValidation = validateStep("responsibilities");
+  const fitnessValidation = validateStep("fitness");
+
+  const assignedResponsibilities = useMemo(
+    () => PRESCRIBED_RESPONSIBILITIES.filter((pr) => responsibilityAssignments[pr.ref]),
+    [responsibilityAssignments]
+  );
+
+  const ownedResponsibilities = useMemo(
+    () => assignedResponsibilities.filter((pr) => responsibilityOwners[pr.ref]),
+    [assignedResponsibilities, responsibilityOwners]
+  );
+
+  const completionStats = useMemo(() => {
+    const total = 4; // 4 main sections
+    let complete = 0;
+
+    if (firmValidation.isValid) complete++;
+    if (respValidation.isValid) complete++;
+    if (fitnessValidation.isValid) complete++;
+    if (individuals.length > 0 && ownedResponsibilities.length > 0) complete++;
+
+    return {
+      percentage: Math.round((complete / total) * 100),
+      complete,
+      total,
+    };
+  }, [firmValidation, respValidation, fitnessValidation, individuals.length, ownedResponsibilities.length]);
+
+  const today = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div className="glass-panel p-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.4em] text-emerald">step 04</p>
+          <h3 className="text-3xl font-display mt-2">Board-ready SMCR Report</h3>
+          <p className="text-sm text-sand/70 mt-2">Generated {today}</p>
+        </div>
+        <FileText className="size-10 text-emerald" />
+      </div>
+
+      {/* Completion Overview */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xl font-semibold">Journey Completion</h4>
+          <div className="text-3xl font-bold text-emerald">{completionStats.percentage}%</div>
+        </div>
+        <div className="h-3 rounded-full bg-midnight/60 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-emerald to-emerald/80 transition-all duration-500"
+            style={{ width: `${completionStats.percentage}%` }}
+          />
+        </div>
+        <p className="text-sm text-sand/70">
+          {completionStats.complete} of {completionStats.total} key sections completed
+        </p>
+      </div>
+
+      {/* Firm Profile Summary */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Shield className="size-5 text-emerald" />
+          <h4 className="text-xl font-semibold">Firm Profile</h4>
+          {firmValidation.isValid ? (
+            <CheckCircle2 className="size-5 text-emerald" />
+          ) : (
+            <AlertCircle className="size-5 text-warning" />
+          )}
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-sand/60 uppercase tracking-wider">Firm Name</p>
+            <p className="text-base text-sand">{firmProfile.firmName || "–"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-sand/60 uppercase tracking-wider">Firm Type</p>
+            <p className="text-base text-sand">{firmProfile.firmType || "–"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-sand/60 uppercase tracking-wider">SMCR Category</p>
+            <p className="text-base text-sand">{firmProfile.smcrCategory || "–"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-sand/60 uppercase tracking-wider">CASS Firm</p>
+            <p className="text-base text-sand">{firmProfile.isCASSFirm ? "Yes" : "No"}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* SMF Roster */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Users className="size-5 text-emerald" />
+          <h4 className="text-xl font-semibold">Senior Manager Functions</h4>
+        </div>
+        {individuals.length === 0 ? (
+          <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3">
+            <p className="text-sm text-warning">No SMF individuals added</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {individuals.map((individual) => {
+              const ownedCount = Object.values(responsibilityOwners).filter(
+                (id) => id === individual.id
+              ).length;
+
+              return (
+                <div
+                  key={individual.id}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 flex items-center justify-between"
+                >
+                  <div>
+                    <p className="text-base font-semibold text-sand">{individual.name}</p>
+                    <p className="text-sm text-sand/70">{individual.smfRole}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-emerald">{ownedCount} responsibilities</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Responsibility Assignment Matrix */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="size-5 text-emerald" />
+          <h4 className="text-xl font-semibold">Prescribed Responsibilities</h4>
+          {respValidation.isValid ? (
+            <CheckCircle2 className="size-5 text-emerald" />
+          ) : (
+            <AlertCircle className="size-5 text-warning" />
+          )}
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="text-center">
+              <p className="text-2xl font-semibold text-sand">{assignedResponsibilities.length}</p>
+              <p className="text-xs text-sand/60">Assigned</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-semibold text-emerald">{ownedResponsibilities.length}</p>
+              <p className="text-xs text-sand/60">With Owner</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-semibold text-warning">
+                {assignedResponsibilities.length - ownedResponsibilities.length}
+              </p>
+              <p className="text-xs text-sand/60">Unassigned</p>
+            </div>
+          </div>
+          {assignedResponsibilities.length > 0 && (
+            <div className="space-y-2 pt-4 border-t border-white/10">
+              {assignedResponsibilities.map((resp) => {
+                const owner = individuals.find((ind) => ind.id === responsibilityOwners[resp.ref]);
+                return (
+                  <div key={resp.ref} className="flex items-start gap-3 text-sm">
+                    <span className="inline-flex size-6 items-center justify-center rounded-full border border-white/20 bg-white/5 text-xs font-semibold flex-shrink-0">
+                      {resp.ref}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sand/80">{resp.text}</p>
+                      {owner && (
+                        <p className="text-xs text-emerald mt-1">Owner: {owner.name} ({owner.smfRole})</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fitness & Propriety Status */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Shield className="size-5 text-emerald" />
+          <h4 className="text-xl font-semibold">Fitness & Propriety</h4>
+          {fitnessValidation.isValid ? (
+            <CheckCircle2 className="size-5 text-emerald" />
+          ) : (
+            <AlertCircle className="size-5 text-warning" />
+          )}
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-sand/60 uppercase tracking-wider">Individuals Assessed</p>
+              <p className="text-2xl font-semibold text-sand">{individuals.length}</p>
+            </div>
+            <div>
+              <p className="text-xs text-sand/60 uppercase tracking-wider">Assessment Responses</p>
+              <p className="text-2xl font-semibold text-sand">{fitnessResponses.length}</p>
+            </div>
+          </div>
+          {fitnessValidation.errors.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              {fitnessValidation.errors.map((error, idx) => (
+                <p key={idx} className="text-sm text-warning flex items-center gap-2">
+                  <AlertCircle className="size-4" />
+                  {error}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Export Actions */}
+      <div className="rounded-2xl border border-emerald/30 bg-emerald/5 p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Download className="size-5 text-emerald" />
+          <h4 className="text-xl font-semibold">Export Report</h4>
+        </div>
+        <p className="text-sm text-sand/70">
+          Download this report in various formats for board submission or regulatory filing.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2"
+            onClick={() => alert("PDF export coming soon")}
+          >
+            <Download className="size-4" />
+            Export PDF
+          </button>
+          <button
+            type="button"
+            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2"
+            onClick={() => alert("CSV export coming soon")}
+          >
+            <Download className="size-4" />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="col-span-2 rounded-full bg-emerald/90 text-midnight px-6 py-3 font-semibold hover:bg-emerald transition flex items-center justify-center gap-2"
+            onClick={() => alert("Share functionality coming soon")}
+          >
+            <Share2 className="size-4" />
+            Share with Board
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

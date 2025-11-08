@@ -1,12 +1,13 @@
 "use client";
 
-import { Check, Circle } from "lucide-react";
+import { Check, Circle, AlertCircle } from "lucide-react";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 
 const statusStyles: Record<string, string> = {
   pending: "text-sand/60 border-white/10",
   active: "text-sand border-emerald/70 bg-white/5",
   done: "text-emerald border-emerald bg-emerald/10",
+  partial: "text-warning border-warning/70 bg-warning/5",
 };
 
 export function WizardSidebar() {
@@ -18,7 +19,7 @@ export function WizardSidebar() {
         <p className="text-xs uppercase tracking-[0.4em] text-emerald">smcr journey</p>
         <h2 className="mt-2 text-2xl">Responsibilities Navigator</h2>
         <p className="text-sm text-sand/70">
-          Autosaves locally. Plug into Neon + MEMA services once API credentials are ready.
+          Progress saved to secure draft storage. Connect MEMA services via settings.
         </p>
       </div>
       <div className="space-y-4">
@@ -33,7 +34,13 @@ export function WizardSidebar() {
             >
               <div className="flex items-center gap-3">
                 <span className="inline-flex size-8 items-center justify-center rounded-full border border-white/20 bg-white/5">
-                  {step.status === "done" ? <Check className="size-4" /> : <Circle className="size-4" />}
+                  {step.status === "done" ? (
+                    <Check className="size-4" />
+                  ) : step.status === "partial" ? (
+                    <AlertCircle className="size-4" />
+                  ) : (
+                    <Circle className="size-4" />
+                  )}
                 </span>
                 <div>
                   <p className={`text-sm uppercase tracking-widest ${isActive ? "text-emerald" : "text-sand/70"}`}>
