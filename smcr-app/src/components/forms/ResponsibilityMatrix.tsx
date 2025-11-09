@@ -4,6 +4,7 @@ import { useSmcrStore } from "@/stores/useSmcrStore";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
 import { Network, CheckCircle2, AlertCircle } from "lucide-react";
 import { useMemo } from "react";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 
 export function ResponsibilityMatrix() {
   const individuals = useSmcrStore((state) => state.individuals);
@@ -152,6 +153,8 @@ export function ResponsibilityMatrix() {
           </p>
         </div>
       )}
+
+      <WizardNavigation currentStep="responsibilities" showErrors />
     </div>
   );
 }

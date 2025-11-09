@@ -4,6 +4,7 @@ import { FIT_SECTIONS } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { CheckCircle2, User, ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 
 export function FitnessChecklist() {
   const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
@@ -166,6 +167,8 @@ export function FitnessChecklist() {
           })}
         </div>
       )}
+
+      <WizardNavigation currentStep="fitness" showErrors />
     </div>
   );
 }

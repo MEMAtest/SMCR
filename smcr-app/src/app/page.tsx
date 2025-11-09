@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Palette, PieChart, Sparkles } from "lucide-react";
+import { ArrowRight, ShieldCheck, PieChart, Sparkles } from "lucide-react";
+import { HealthPreview } from "@/components/landing/HealthPreview";
 
 const proofPoints = [
   {
@@ -59,45 +60,16 @@ export default function Home() {
             </div>
             <div className="mt-12 flex gap-10 text-sm text-sand/80">
               <div>
-                <p className="text-3xl font-semibold text-sand">120+</p>
-                <p>responsibilities mapped effortlessly</p>
+                <p className="text-3xl font-semibold text-sand">—</p>
+                <p>responsibilities mapped</p>
               </div>
               <div>
-                <p className="text-3xl font-semibold text-sand">48 hrs</p>
-                <p>from intake to board-ready report</p>
+                <p className="text-3xl font-semibold text-sand">—</p>
+                <p>avg. time to completion</p>
               </div>
             </div>
           </div>
-          <div className="glass-panel gradient-border p-8 relative overflow-hidden">
-            <div className="absolute inset-0 opacity-30 blur-3xl bg-plumAccent/40" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-4 mb-8">
-                <Image src="/mema-mark.svg" alt="MEMA" width={64} height={64} className="rounded-full border border-emerald/40" />
-                <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-cloud/70">MEMA insight</p>
-                  <p className="text-2xl font-semibold">SMCR Health Preview</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <p className="text-sm text-cloud/80">Coverage score</p>
-                  <p className="text-4xl font-semibold text-emerald">92%</p>
-                  <p className="text-xs text-sand/70">All prescribed responsibilities assigned</p>
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <p className="text-sm text-cloud/80">Certification window</p>
-                  <p className="text-2xl font-semibold">23 days remaining</p>
-                  <p className="text-xs text-warning mt-1 flex items-center gap-2">
-                    <Palette className="size-4" /> FIT evidence pending for SMF16
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                  <p className="text-sm text-cloud/80">Exports ready</p>
-                  <p className="text-lg">Responsibilities map · Fitness attestations · Certification letters</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <HealthPreview />
         </div>
       </section>
 

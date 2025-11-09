@@ -13,7 +13,7 @@ This workspace tracks the design and build of a premium Senior Managers & Certif
 | Framework | **Next.js (App Router) + TypeScript** for interactive experience, server actions, and Vercel-native deployment. |
 | Styling | **Tailwind CSS** powered by shared tokens (`smcr-app/design/tokens.json`); Radix primitives can be layered in later for accessibility wins. |
 | State | **Zustand** store for complex wizard state (firm profile, SMFs, PRs, F&P answers, certification status). |
-| Data Layer | **Drizzle ORM** targeting **Neon Postgres**; API routes expose a typed contract that future MEMA services can consume. |
+| Data Layer | **Drizzle ORM** targeting managed **Postgres** deployment; API routes expose a typed contract that future MEMA services can consume. |
 | Charts | **Recharts** (already used in prototype) wrapped in reusable `InsightCard` components. |
 | Auth | Start with MEMA email magic-link placeholder; plan to swap in MEMA SSO when specs arrive. |
 | Integrations | Configurable base URLs for `vulnerability.memaconsultants.com` and `fcafines.memaconsultants.com`, surfaced as contextual actions. |
@@ -32,13 +32,26 @@ smcr1.html                  – original prototype snapshot for reference
 1. Confirm design tokens + typography choices in `smcr-app/design/tokens.json`.
 2. Flesh out shared UI primitives (buttons, shell, chart cards) so the wizard can reuse consistent building blocks.
 3. Componentize the prototype flows (Firm Profile → SMFs → Responsibilities → Fitness & Propriety → Reports).
-4. Layer in mock API routes + Neon schema so the UI can hydrate from example data.
+4. Layer in mock API routes + Postgres schema so the UI can hydrate from example data.
 5. Connect to MEMA suite once endpoints and auth model are ready.
 
 ## Data Layer Quickstart
-1. Duplicate `smcr-app/.env.example` to `smcr-app/.env` and paste your Neon connection string (never commit the real value).
-2. From `smcr-app/`, run `npm run db:push` to sync the Drizzle schema (`src/lib/schema.ts`) into Neon.
+1. Duplicate `smcr-app/.env.example` to `smcr-app/.env` and paste your Postgres connection string (never commit the real value).
+2. From `smcr-app/`, run `npm run db:push` to sync the Drizzle schema (`src/lib/schema.ts`) into your database.
 3. Use `npm run db:studio` for a quick visual inspector while prototyping.
 4. Import the database client via `getDb()` from `src/lib/db.ts` inside API routes or server components when you are ready to persist wizard data.
+
+## Draft Save/Load Flow
+The wizard automatically saves progress to secure Postgres storage:
+
+- **Draft Service** (`src/lib/services/draftService.ts`): Abstraction layer that hides storage backend details from UI components.
+- **Auto-save**: Draft IDs are stored in localStorage; the builder auto-loads drafts on mount via URL params (`?draftId=...`) or localStorage.
+- **API Endpoints**:
+  - `POST /api/firms` - Create new draft
+  - `GET /api/firms/:id` - Load existing draft
+  - `PUT /api/firms/:id` - Update draft
+  - `DELETE /api/firms/:id` - Delete draft
+- **Session Restoration**: Landing page displays recent draft stats and offers "Continue Draft" CTA to resume work.
+- **State Hydration**: The `DraftLoader` component in builder automatically restores Zustand store state from saved drafts.
 
 Refer to `/docs/architecture.md` and `/docs/roadmap.md` for details. Let me know if anything here should change before we scaffold the actual app.

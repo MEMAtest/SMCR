@@ -3,6 +3,7 @@
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { Info } from "lucide-react";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 
 export function ResponsibilitiesPreview() {
   const assignments = useSmcrStore((state) => state.responsibilityAssignments);
@@ -40,6 +41,8 @@ export function ResponsibilitiesPreview() {
           </label>
         ))}
       </div>
+
+      <WizardNavigation currentStep="responsibilities" showErrors />
     </div>
   );
 }

@@ -33,17 +33,21 @@ type SmcrState = {
 
   // Actions - responsibilities
   setResponsibilityAssignment: (ref: string, value: boolean) => void;
+  setResponsibilityAssignments: (assignments: Record<string, boolean>) => void;
   setResponsibilityOwner: (ref: string, individualId: string) => void;
+  setResponsibilityOwners: (owners: Record<string, string>) => void;
   getResponsibilityCoverage: () => number;
 
   // Actions - individuals
   addIndividual: (individual: Individual) => void;
   updateIndividual: (id: string, updates: Partial<Individual>) => void;
   removeIndividual: (id: string) => void;
+  setIndividuals: (individuals: Individual[]) => void;
 
   // Actions - fitness
   setFitnessResponse: (response: FitnessResponse) => void;
   removeFitnessResponse: (sectionId: string, questionId: string) => void;
+  setFitnessResponses: (responses: FitnessResponse[]) => void;
 
   // Actions - validation
   validateStep: (stepId: JourneyStepKey) => ReturnType<typeof getStepValidation>;
@@ -101,10 +105,20 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
     get().updateStepStatuses();
   },
 
+  setResponsibilityAssignments: (assignments) => {
+    set({ responsibilityAssignments: assignments });
+    get().updateStepStatuses();
+  },
+
   setResponsibilityOwner: (ref, individualId) => {
     set((state) => ({
       responsibilityOwners: { ...state.responsibilityOwners, [ref]: individualId },
     }));
+    get().updateStepStatuses();
+  },
+
+  setResponsibilityOwners: (owners) => {
+    set({ responsibilityOwners: owners });
     get().updateStepStatuses();
   },
 
@@ -147,6 +161,11 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
     get().updateStepStatuses();
   },
 
+  setIndividuals: (individuals) => {
+    set({ individuals });
+    get().updateStepStatuses();
+  },
+
   // Fitness actions
   setFitnessResponse: (response) => {
     set((state) => {
@@ -171,6 +190,11 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
         (r) => r.sectionId !== sectionId || r.questionId !== questionId
       ),
     }));
+    get().updateStepStatuses();
+  },
+
+  setFitnessResponses: (responses) => {
+    set({ fitnessResponses: responses });
     get().updateStepStatuses();
   },
 

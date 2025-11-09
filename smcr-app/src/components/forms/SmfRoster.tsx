@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { UserPlus, Trash2, Users } from "lucide-react";
 import type { Individual } from "@/lib/validation";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 
 export function SmfRoster() {
   const individuals = useSmcrStore((state) => state.individuals);
@@ -148,6 +149,8 @@ export function SmfRoster() {
           Add SMF Individual
         </button>
       )}
+
+      <WizardNavigation currentStep="responsibilities" showErrors />
     </div>
   );
 }
