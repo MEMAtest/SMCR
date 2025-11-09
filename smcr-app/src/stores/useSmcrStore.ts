@@ -54,8 +54,8 @@ type SmcrState = {
   loadDraft: (data: Partial<SmcrState>) => void;
 };
 
-const defaultAssignments = PRESCRIBED_RESPONSIBILITIES.reduce<Record<string, boolean>>((acc, item, index) => {
-  acc[item.ref] = index < 2;
+const defaultAssignments = PRESCRIBED_RESPONSIBILITIES.reduce<Record<string, boolean>>((acc, item) => {
+  acc[item.ref] = false; // All unchecked by default
   return acc;
 }, {});
 
@@ -138,7 +138,11 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
       responsibilityOwners: Object.fromEntries(
         Object.entries(state.responsibilityOwners).filter(([, ownerId]) => ownerId !== id)
       ),
-      fitnessResponses: state.fitnessResponses.filter((resp) => !resp.questionId.startsWith(id)),
+      // New format: questionId is "individualId::sectionId::questionIndex"
+      fitnessResponses: state.fitnessResponses.filter((resp) => {
+        const individualId = resp.questionId.split("::")[0];
+        return individualId !== id;
+      }),
     }));
     get().updateStepStatuses();
   },

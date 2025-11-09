@@ -20,11 +20,12 @@ export function ResponsibilityMatrix() {
   // Calculate stats
   const stats = useMemo(() => {
     const total = assignedResponsibilities.length;
-    const owned = Object.values(responsibilityOwners).filter((id) => id).length;
+    // Only count owners for currently assigned responsibilities
+    const owned = assignedResponsibilities.filter((pr) => responsibilityOwners[pr.ref]).length;
     const unassigned = total - owned;
 
     return { total, owned, unassigned };
-  }, [assignedResponsibilities.length, responsibilityOwners]);
+  }, [assignedResponsibilities, responsibilityOwners]);
 
   const getOwnerName = (ref: string) => {
     const ownerId = responsibilityOwners[ref];

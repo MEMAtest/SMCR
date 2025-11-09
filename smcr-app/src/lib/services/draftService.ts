@@ -104,8 +104,17 @@ export async function loadDraft(draftId: string): Promise<LoadDraftResult> {
 
     const result = await response.json();
 
+    // Import PRESCRIBED_RESPONSIBILITIES to initialize all responsibilities
+    const { PRESCRIBED_RESPONSIBILITIES } = await import("@/lib/smcr-data");
+
     // Transform API response to match store structure
+    // Initialize ALL responsibilities to false, then set loaded ones to true
     const responsibilityAssignments: Record<string, boolean> = {};
+    PRESCRIBED_RESPONSIBILITIES.forEach((pr) => {
+      responsibilityAssignments[pr.ref] = false;
+    });
+
+    // Set loaded responsibilities to true
     if (result.responsibilities && Array.isArray(result.responsibilities)) {
       result.responsibilities.forEach((resp: { ref: string }) => {
         responsibilityAssignments[resp.ref] = true;

@@ -91,12 +91,16 @@ export async function POST(request: Request) {
 
     // Insert fitness assessments
     if (fitnessResponses && fitnessResponses.length > 0) {
-      const fitnessRows = fitnessResponses.map((resp) => ({
-        individualId: resp.questionId.split("-")[0], // Extract individual ID from questionId
-        fitSection: resp.sectionId,
-        response: resp.response,
-        evidenceLinks: resp.evidence ? [resp.evidence] : [],
-      }));
+      const fitnessRows = fitnessResponses.map((resp) => {
+        // New format: questionId is "individualId::sectionId::questionIndex"
+        const [individualId, sectionId] = resp.questionId.split("::");
+        return {
+          individualId,
+          fitSection: resp.questionId, // Store full questionId for later retrieval
+          response: resp.response,
+          evidenceLinks: resp.evidence ? [resp.evidence] : [],
+        };
+      });
       await db.insert(fitnessAssessments).values(fitnessRows);
     }
 

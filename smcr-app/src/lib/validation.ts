@@ -84,7 +84,12 @@ export function validateResponsibilities(
 
   // Check if responsibilities are assigned to individuals
   if (responsibilityOwners) {
-    const ownedCount = Object.values(responsibilityOwners).filter((id) => id).length;
+    // Count only owners for currently assigned responsibilities
+    const assignedRefs = Object.entries(assignments)
+      .filter(([, value]) => value)
+      .map(([ref]) => ref);
+
+    const ownedCount = assignedRefs.filter((ref) => responsibilityOwners[ref]).length;
     const unassignedCount = assignedCount - ownedCount;
 
     if (unassignedCount > 0) {

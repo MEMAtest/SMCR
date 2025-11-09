@@ -68,9 +68,18 @@ export function ReportSummaryPanel() {
       // Count how many responsibilities this individual owns
       const ownedResponsibilities = Object.values(responsibilityOwners).filter((id) => id === individual.id).length;
 
-      // Count fitness responses for this individual (simplified - assuming 3 sections per individual)
-      const individualResponses = fitnessResponses.filter((r) => r.questionId.includes(individual.id)).length;
-      const completionPercentage = individualResponses >= 3 ? 100 : Math.round((individualResponses / 3) * 100);
+      // Count fitness responses for this individual
+      // New questionId format: "individualId::sectionId::questionIndex"
+      const individualResponses = fitnessResponses.filter((r) => {
+        const [individualId] = r.questionId.split("::");
+        return individualId === individual.id;
+      }).length;
+
+      // Calculate completion (6 total questions across 3 FIT sections with 2 questions each)
+      const totalQuestions = 6;
+      const completionPercentage = totalQuestions > 0
+        ? Math.round((individualResponses / totalQuestions) * 100)
+        : 0;
 
       return {
         name: individual.smfRole || individual.name.substring(0, 8),

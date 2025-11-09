@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { firms, responsibilities, individuals, fitnessAssessments } from "@/lib/schema";
+import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
+
+const responsibilityMap = new Map(
+  PRESCRIBED_RESPONSIBILITIES.map((item) => [item.ref, item.text])
+);
 
 /**
  * GET /api/firms/[id] - Retrieve a specific firm with all related data
@@ -33,11 +38,15 @@ export async function GET(
       .from(individuals)
       .where(eq(individuals.firmId, firmId));
 
-    // Get fitness assessments
-    const fitness = await db
-      .select()
-      .from(fitnessAssessments)
-      .where(eq(fitnessAssessments.individualId, indivs.length > 0 ? indivs[0].id : ""));
+    // Get fitness assessments for all individuals
+    const individualIds = indivs.map((i) => i.id);
+    const fitness =
+      individualIds.length > 0
+        ? await db
+            .select()
+            .from(fitnessAssessments)
+            .where(inArray(fitnessAssessments.individualId, individualIds))
+        : [];
 
     return NextResponse.json({
       id: firm.id,
@@ -58,12 +67,16 @@ export async function GET(
         smfRole: i.smfRole,
         email: i.email,
       })),
-      fitnessResponses: fitness.map((f) => ({
-        sectionId: f.fitSection,
-        questionId: `${f.individualId}-${f.fitSection}`,
-        response: f.response || "",
-        evidence: f.evidenceLinks && f.evidenceLinks.length > 0 ? f.evidenceLinks[0] : "",
-      })),
+      fitnessResponses: fitness.map((f) => {
+        // fitSection now stores the full questionId in format "individualId::sectionId::questionIndex"
+        const [individualId, sectionId] = f.fitSection.split("::");
+        return {
+          sectionId: sectionId || f.fitSection, // Fallback for old data
+          questionId: f.fitSection, // Full questionId
+          response: f.response || "",
+          evidence: f.evidenceLinks && f.evidenceLinks.length > 0 ? f.evidenceLinks[0] : "",
+        };
+      }),
     });
   } catch (error) {
     console.error("Failed to retrieve firm", error);
@@ -109,49 +122,93 @@ export async function PUT(
         .where(eq(firms.id, firmId));
     }
 
-    // Delete and re-insert responsibilities (simple approach for now)
+    // Delete and re-insert responsibilities
     await db.delete(responsibilities).where(eq(responsibilities.firmId, firmId));
     if (responsibilityRefs && responsibilityRefs.length > 0) {
-      const rows = responsibilityRefs.map((ref: string) => ({
-        firmId,
-        reference: ref,
-        title: ref, // Could map to full title
-        status: "assigned",
-        ownerId: responsibilityOwners?.[ref] || null,
-      }));
-      await db.insert(responsibilities).values(rows);
+      const rows = responsibilityRefs
+        .filter((ref: string) => responsibilityMap.has(ref))
+        .map((ref: string) => ({
+          firmId,
+          reference: ref,
+          title: responsibilityMap.get(ref) ?? ref,
+          status: "assigned",
+          ownerId: responsibilityOwners?.[ref] || null,
+        }));
+
+      if (rows.length > 0) {
+        await db.insert(responsibilities).values(rows);
+      }
+    }
+
+    // Get existing individuals to delete their fitness assessments
+    const existingIndividuals = await db.select().from(individuals).where(eq(individuals.firmId, firmId));
+    const existingIndividualIds = existingIndividuals.map((i) => i.id);
+
+    // Delete fitness assessments for existing individuals
+    if (existingIndividualIds.length > 0) {
+      await db.delete(fitnessAssessments).where(inArray(fitnessAssessments.individualId, existingIndividualIds));
     }
 
     // Delete and re-insert individuals
     await db.delete(individuals).where(eq(individuals.firmId, firmId));
-    if (indivs && indivs.length > 0) {
-      const individualRows = indivs.map((ind: any) => ({
-        firmId,
-        fullName: ind.name,
-        smfRole: ind.smfRole,
-        email: ind.email || null,
-      }));
-      await db.insert(individuals).values(individualRows);
-    }
+    const newIndividualIds: Record<string, string> = {}; // Map payload ID to DB UUID
 
-    // Delete and re-insert fitness assessments
-    // Note: We need to delete by individualId since firmId doesn't exist on fitness_assessments
-    // For simplicity, we'll skip this for now in PUT - fitness assessments should be managed separately
-    if (fitnessResponses && fitnessResponses.length > 0 && indivs && indivs.length > 0) {
-      // Delete existing assessments for all individuals in this firm
+    if (indivs && indivs.length > 0) {
       for (const ind of indivs) {
-        if (ind.id) {
-          await db.delete(fitnessAssessments).where(eq(fitnessAssessments.individualId, ind.id));
+        const [inserted] = await db
+          .insert(individuals)
+          .values({
+            firmId,
+            fullName: ind.name,
+            smfRole: ind.smfRole,
+            email: ind.email || null,
+          })
+          .returning({ id: individuals.id });
+
+        if (inserted) {
+          newIndividualIds[ind.id] = inserted.id; // Map old ID to new UUID
         }
       }
+    }
 
-      const fitnessRows = fitnessResponses.map((resp: any) => ({
-        individualId: resp.questionId.split("-")[0],
-        fitSection: resp.sectionId,
-        response: resp.response,
-        evidenceLinks: resp.evidence ? [resp.evidence] : [],
-      }));
-      await db.insert(fitnessAssessments).values(fitnessRows);
+    // Insert fitness assessments with corrected individual IDs
+    if (fitnessResponses && fitnessResponses.length > 0 && Object.keys(newIndividualIds).length > 0) {
+      const fitnessRows = fitnessResponses
+        .map((resp: any) => {
+          // New format: questionId is "individualId::sectionId::questionIndex"
+          const [oldIndividualId, sectionId, questionIndex] = resp.questionId.split("::");
+          const newIndividualId = newIndividualIds[oldIndividualId];
+
+          if (!newIndividualId) {
+            console.warn(`No mapping found for individual ID: ${oldIndividualId}`);
+            return null;
+          }
+
+          // Reconstruct questionId with new UUID
+          const newQuestionId = `${newIndividualId}::${sectionId}::${questionIndex}`;
+
+          return {
+            individualId: newIndividualId,
+            fitSection: newQuestionId, // Store full questionId
+            response: resp.response,
+            evidenceLinks: resp.evidence ? [resp.evidence] : [],
+          };
+        })
+        .filter((row: {
+          individualId: string;
+          fitSection: string;
+          response: string;
+          evidenceLinks: string[];
+        } | null): row is {
+          individualId: string;
+          fitSection: string;
+          response: string;
+          evidenceLinks: string[];
+        } => row !== null);
+
+      if (fitnessRows.length > 0) {
+        await db.insert(fitnessAssessments).values(fitnessRows);
+      }
     }
 
     return NextResponse.json({ id: firmId, message: "Updated successfully" });
