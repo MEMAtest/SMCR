@@ -1,5 +1,4 @@
-import { pdf } from "@react-pdf/renderer";
-import { SmcrReportPDF, type SmcrReportPDFProps } from "./SmcrReportPDF";
+import type { SmcrReportPDFProps } from "./SmcrReportPDF";
 
 /**
  * Generates and downloads an SMCR report PDF
@@ -11,6 +10,12 @@ export async function generateAndDownloadPDF(
   filename: string = "smcr-report.pdf"
 ): Promise<void> {
   try {
+    // Dynamically import PDF library only when needed (lazy loading)
+    const [{ pdf }, { SmcrReportPDF }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("./SmcrReportPDF"),
+    ]);
+
     // Generate the PDF blob
     const blob = await pdf(SmcrReportPDF(props)).toBlob();
 
