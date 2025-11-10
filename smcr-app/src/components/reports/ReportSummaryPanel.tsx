@@ -20,34 +20,48 @@ export function ReportSummaryPanel() {
   const ownedCount = useMemo(() => Object.values(responsibilityOwners).filter((id) => id).length, [responsibilityOwners]);
   const unassignedCount = assignedCount - ownedCount;
 
-  const expectedFitnessResponses = individuals.length * 3; // 3 key FIT sections per individual
+  // More accurate FIT tracking - 30 questions per individual across 3 sections
+  const FIT_QUESTIONS_PER_INDIVIDUAL = 30;
+  const expectedFitnessResponses = individuals.length * FIT_QUESTIONS_PER_INDIVIDUAL;
   const outstandingFitness = Math.max(0, expectedFitnessResponses - fitnessResponses.length);
+  const fitnessCompletionRate = expectedFitnessResponses > 0
+    ? Math.round((fitnessResponses.length / expectedFitnessResponses) * 100)
+    : 0;
 
   const insights = useMemo(
     () => [
       {
         label: "Responsibilities coverage",
-        value: coverage > 0 ? `${coverage}%` : "–",
-        subLabel: assignedCount > 0 ? `${assignedCount} prescribed responsibilities` : "No responsibilities assigned",
+        value: coverage > 0 ? `${coverage}%` : "0%",
+        subLabel: assignedCount > 0
+          ? `${ownedCount}/${assignedCount} assigned • ${unassignedCount} pending`
+          : "No responsibilities selected yet",
         icon: CheckCircle2,
-        tone: "positive" as const,
+        tone: coverage === 100 ? ("positive" as const) : coverage > 0 ? ("warning" as const) : ("neutral" as const),
+        action: coverage < 100 && assignedCount > 0 ? "Complete responsibility assignments" : undefined,
       },
       {
-        label: "Outstanding assignments",
-        value: unassignedCount > 0 ? unassignedCount.toString() : "–",
-        subLabel: unassignedCount > 0 ? "Responsibilities need owners" : "All assigned",
+        label: "SMF individuals",
+        value: individuals.length.toString(),
+        subLabel: individuals.length > 0
+          ? `${individuals.length} individual${individuals.length === 1 ? "" : "s"} with SMF roles`
+          : "Add individuals to continue",
         icon: AlertTriangle,
-        tone: unassignedCount > 0 ? ("warning" as const) : ("positive" as const),
+        tone: individuals.length > 0 ? ("positive" as const) : ("warning" as const),
+        action: individuals.length === 0 ? "Add your first SMF individual" : undefined,
       },
       {
         label: "FIT assessments",
-        value: outstandingFitness > 0 ? outstandingFitness.toString() : individuals.length > 0 ? "Complete" : "–",
-        subLabel: individuals.length > 0 ? `${individuals.length} individuals` : "No individuals added",
+        value: individuals.length > 0 ? `${fitnessCompletionRate}%` : "–",
+        subLabel: individuals.length > 0
+          ? `${fitnessResponses.length}/${expectedFitnessResponses} questions • ${outstandingFitness} remaining`
+          : "Complete SMF roster first",
         icon: Award,
-        tone: outstandingFitness === 0 && individuals.length > 0 ? ("positive" as const) : ("warning" as const),
+        tone: fitnessCompletionRate === 100 ? ("positive" as const) : fitnessCompletionRate > 0 ? ("warning" as const) : ("neutral" as const),
+        action: individuals.length > 0 && fitnessCompletionRate < 100 ? "Continue FIT assessments" : undefined,
       },
     ],
-    [coverage, assignedCount, unassignedCount, outstandingFitness, individuals.length]
+    [coverage, assignedCount, ownedCount, unassignedCount, outstandingFitness, individuals.length, fitnessResponses.length, expectedFitnessResponses, fitnessCompletionRate]
   );
 
   const pieData = useMemo(
@@ -75,8 +89,8 @@ export function ReportSummaryPanel() {
         return individualId === individual.id;
       }).length;
 
-      // Calculate completion (6 total questions across 3 FIT sections with 2 questions each)
-      const totalQuestions = 6;
+      // Calculate completion (30 total questions across 3 FIT sections)
+      const totalQuestions = FIT_QUESTIONS_PER_INDIVIDUAL;
       const completionPercentage = totalQuestions > 0
         ? Math.round((individualResponses / totalQuestions) * 100)
         : 0;
@@ -105,18 +119,42 @@ export function ReportSummaryPanel() {
         {insights.map((insight) => (
           <div
             key={insight.label}
-            className={`rounded-2xl border px-4 py-3 ${
-              insight.tone === "positive" ? "border-emerald/40 bg-emerald/5" : "border-warning/30 bg-warning/5"
+            className={`rounded-2xl border px-4 py-3 transition-all ${
+              insight.tone === "positive"
+                ? "border-emerald/40 bg-emerald/5"
+                : insight.tone === "warning"
+                ? "border-warning/30 bg-warning/5"
+                : "border-white/20 bg-white/5"
             }`}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-1">
               <div>
                 <p className="text-sm text-sand/70">{insight.label}</p>
-                <p className="text-xl font-semibold">{insight.value}</p>
+                <p className={`text-xl font-semibold ${
+                  insight.tone === "positive"
+                    ? "text-emerald"
+                    : insight.tone === "warning"
+                    ? "text-warning"
+                    : "text-sand"
+                }`}>
+                  {insight.value}
+                </p>
               </div>
-              <insight.icon className="size-6" />
+              <insight.icon className={`size-6 ${
+                insight.tone === "positive"
+                  ? "text-emerald"
+                  : insight.tone === "warning"
+                  ? "text-warning"
+                  : "text-sand/70"
+              }`} />
             </div>
             <p className="text-xs text-sand/60">{insight.subLabel}</p>
+            {insight.action && (
+              <p className="text-xs text-plumAccent mt-2 flex items-center gap-1">
+                <span className="inline-block size-1.5 rounded-full bg-plumAccent animate-pulse" />
+                {insight.action}
+              </p>
+            )}
           </div>
         ))}
       </div>

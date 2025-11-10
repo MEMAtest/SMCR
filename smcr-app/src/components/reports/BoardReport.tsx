@@ -107,20 +107,48 @@ export function BoardReport() {
       </div>
 
       {/* Completion Overview */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
+      <div className={`rounded-2xl border p-6 space-y-4 transition-all duration-500 ${
+        completionStats.percentage === 100
+          ? "border-emerald/50 bg-gradient-to-br from-emerald/10 via-emerald/5 to-transparent shadow-lg shadow-emerald/20"
+          : "border-white/10 bg-white/5"
+      }`}>
         <div className="flex items-center justify-between">
           <h4 className="text-xl font-semibold">Journey Completion</h4>
-          <div className="text-3xl font-bold text-emerald">{completionStats.percentage}%</div>
+          <div className={`text-3xl font-bold transition-all duration-500 ${
+            completionStats.percentage === 100 ? "text-emerald scale-110" : "text-emerald"
+          }`}>
+            {completionStats.percentage}%
+          </div>
         </div>
-        <div className="h-3 rounded-full bg-midnight/60 overflow-hidden">
+        <div className="relative h-3 rounded-full bg-midnight/60 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald to-emerald/80 transition-all duration-500"
+            className={`h-full bg-gradient-to-r transition-all duration-1000 ease-out ${
+              completionStats.percentage === 100
+                ? "from-emerald via-emerald to-emerald animate-pulse"
+                : "from-emerald to-emerald/80"
+            }`}
             style={{ width: `${completionStats.percentage}%` }}
           />
+          {completionStats.percentage === 100 && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+          )}
         </div>
-        <p className="text-sm text-sand/70">
-          {completionStats.complete} of {completionStats.total} key sections completed
-        </p>
+        {completionStats.percentage === 100 ? (
+          <div className="rounded-xl border border-emerald/30 bg-emerald/5 px-4 py-3 flex items-center gap-3">
+            <CheckCircle2 className="size-5 text-emerald animate-bounce" />
+            <div>
+              <p className="text-sm font-semibold text-emerald">Congratulations!</p>
+              <p className="text-xs text-emerald/80">Your SMCR compliance framework is complete and ready for board submission.</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-sand/70">
+            {completionStats.complete} of {completionStats.total} key sections completed
+            {completionStats.percentage >= 75 && (
+              <span className="ml-2 text-emerald">• Almost there!</span>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Firm Profile Summary */}
