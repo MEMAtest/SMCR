@@ -2,8 +2,9 @@
 
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
-import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield } from "lucide-react";
-import { useMemo } from "react";
+import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { generateAndDownloadPDF, generatePDFFilename } from "@/lib/pdf/generatePDF";
 
 export function BoardReport() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
@@ -12,6 +13,9 @@ export function BoardReport() {
   const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
   const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
   const validateStep = useSmcrStore((state) => state.validateStep);
+
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
 
   // Calculate completeness
   const firmValidation = validateStep("firm");
@@ -43,6 +47,28 @@ export function BoardReport() {
       total,
     };
   }, [firmValidation, respValidation, fitnessValidation, individuals.length, ownedResponsibilities.length]);
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExportingPDF(true);
+      const filename = generatePDFFilename(firmProfile.firmName);
+      await generateAndDownloadPDF(
+        {
+          firmProfile,
+          individuals,
+          assignedResponsibilities,
+          responsibilityOwners,
+          fitnessResponses,
+        },
+        filename
+      );
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -244,11 +270,21 @@ export function BoardReport() {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2"
-            onClick={() => alert("PDF export coming soon")}
+            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleExportPDF}
+            disabled={isExportingPDF}
           >
-            <Download className="size-4" />
-            Export PDF
+            {isExportingPDF ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating PDF...
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Export PDF
+              </>
+            )}
           </button>
           <button
             type="button"
