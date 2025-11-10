@@ -2,10 +2,11 @@
 
 import { FIT_SECTIONS } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
-import { CheckCircle2, User, ChevronDown, Info, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, User, ChevronDown, Info, AlertCircle, ShieldAlert } from "lucide-react";
+import { useState, useMemo } from "react";
 import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 import type { FitnessResponse } from "@/lib/validation";
+import { calculateIndividualRisk, getRiskColorClass, type RiskLevel } from "@/lib/fitness-risk-rating";
 
 export function FitnessChecklist() {
   const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
@@ -133,6 +134,37 @@ export function FitnessChecklist() {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // Bulk action: Set all questions in a section to Yes/No/N/A
+  const handleBulkAction = (individualId: string, sectionId: string, value: "yes" | "no" | "n/a") => {
+    const section = FIT_SECTIONS.find((s) => s.id === sectionId);
+    if (!section) return;
+
+    section.questions.forEach((question) => {
+      handleResponseChange(individualId, sectionId, question.id, value);
+    });
+  };
+
+  // Calculate risk assessment for an individual
+  const getIndividualRisk = (individualId: string) => {
+    const individual = individuals.find((ind) => ind.id === individualId);
+    if (!individual) return null;
+
+    // Convert fitnessResponses array to the format expected by risk calculator
+    const individualResponses: Record<string, any> = {};
+    fitnessResponses.forEach((response) => {
+      const parsed = parseQuestionId(response.questionId);
+      if (parsed.individualId === individualId) {
+        individualResponses[parsed.questionId] = {
+          response: response.response,
+          details: response.details,
+          date: response.date,
+        };
+      }
+    });
+
+    return calculateIndividualRisk(individualId, individual.name, individualResponses);
+  };
+
   return (
     <div className="glass-panel p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -156,6 +188,7 @@ export function FitnessChecklist() {
           {individuals.map((individual) => {
             const completion = getIndividualCompletion(individual.id);
             const isExpanded = expandedIndividual === individual.id;
+            const riskAssessment = getIndividualRisk(individual.id);
 
             return (
               <div key={individual.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
@@ -178,6 +211,14 @@ export function FitnessChecklist() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    {riskAssessment && riskAssessment.overallScore > 0 && (
+                      <div className={`rounded-full px-3 py-1 text-xs font-semibold border ${getRiskColorClass(riskAssessment.riskLevel)}`}>
+                        <div className="flex items-center gap-1">
+                          <ShieldAlert className="size-3" />
+                          {riskAssessment.riskLevel} Risk
+                        </div>
+                      </div>
+                    )}
                     <div className="text-right">
                       <p className="text-sm text-emerald font-semibold">{completion}% complete</p>
                     </div>
@@ -223,6 +264,32 @@ export function FitnessChecklist() {
 
                           {isSectionExpanded && (
                             <div className="px-4 pb-4 space-y-4 bg-midnight/30">
+                              {/* Bulk action buttons */}
+                              <div className="flex items-center gap-2 pt-2">
+                                <span className="text-xs text-sand/60 mr-2">Quick fill:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBulkAction(individual.id, section.id, "yes")}
+                                  className="px-3 py-1 rounded-full text-xs font-semibold border border-emerald/30 bg-emerald/10 text-emerald hover:bg-emerald/20 transition"
+                                >
+                                  Yes to All
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBulkAction(individual.id, section.id, "no")}
+                                  className="px-3 py-1 rounded-full text-xs font-semibold border border-warning/30 bg-warning/10 text-warning hover:bg-warning/20 transition"
+                                >
+                                  No to All
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBulkAction(individual.id, section.id, "n/a")}
+                                  className="px-3 py-1 rounded-full text-xs font-semibold border border-sand/30 bg-sand/10 text-sand hover:bg-sand/20 transition"
+                                >
+                                  N/A to All
+                                </button>
+                              </div>
+
                               {section.questions.map((question) => {
                                 const response = getResponse(individual.id, section.id, question.id);
                                 const selectedValue = response?.response || "";

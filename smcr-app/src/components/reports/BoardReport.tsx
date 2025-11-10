@@ -2,10 +2,11 @@
 
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
-import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield, Loader2 } from "lucide-react";
+import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield, Loader2, ShieldAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { generateAndDownloadPDF, generatePDFFilename } from "@/lib/pdf/generatePDF";
 import { exportResponsibilitiesCSV } from "@/lib/csv/generateCSV";
+import { calculateAllRisks, getRiskColorClass, getFirmRiskSummary } from "@/lib/fitness-risk-rating";
 
 export function BoardReport() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
@@ -93,6 +94,36 @@ export function BoardReport() {
     month: "long",
     year: "numeric",
   });
+
+  // Calculate risk assessments for all individuals
+  const riskAssessments = useMemo(() => {
+    // Convert fitnessResponses array to nested object structure
+    const fitnessData: Record<string, Record<string, any>> = {};
+
+    fitnessResponses.forEach((response) => {
+      // Parse questionId format: individualId::sectionId::questionId
+      const parts = response.questionId.split("::");
+      if (parts.length === 3) {
+        const [individualId, , questionId] = parts;
+
+        if (!fitnessData[individualId]) {
+          fitnessData[individualId] = {};
+        }
+
+        fitnessData[individualId][questionId] = {
+          response: response.response,
+          details: response.details,
+          date: response.date,
+        };
+      }
+    });
+
+    return calculateAllRisks(individuals, fitnessData);
+  }, [individuals, fitnessResponses]);
+
+  const firmRiskSummary = useMemo(() => {
+    return getFirmRiskSummary(riskAssessments);
+  }, [riskAssessments]);
 
   return (
     <div className="glass-panel p-8 space-y-8">
@@ -309,6 +340,129 @@ export function BoardReport() {
           )}
         </div>
       </div>
+
+      {/* Risk Assessment */}
+      {riskAssessments.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="size-5 text-emerald" />
+            <h4 className="text-xl font-semibold">Fitness & Propriety Risk Assessment</h4>
+          </div>
+
+          {/* Firm-wide Risk Summary */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-sm text-sand/70 mb-3">Firm-wide Risk Summary</p>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="text-center">
+                <p className="text-2xl font-semibold text-sand">{firmRiskSummary.total}</p>
+                <p className="text-xs text-sand/60">Total</p>
+              </div>
+              {firmRiskSummary.high > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-semibold text-red-500">{firmRiskSummary.high}</p>
+                  <p className="text-xs text-sand/60">High Risk</p>
+                </div>
+              )}
+              {firmRiskSummary.medium > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-semibold text-amber-500">{firmRiskSummary.medium}</p>
+                  <p className="text-xs text-sand/60">Medium Risk</p>
+                </div>
+              )}
+              {firmRiskSummary.low > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-semibold text-yellow-500">{firmRiskSummary.low}</p>
+                  <p className="text-xs text-sand/60">Low Risk</p>
+                </div>
+              )}
+              {firmRiskSummary.clear > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-semibold text-emerald">{firmRiskSummary.clear}</p>
+                  <p className="text-xs text-sand/60">Clear</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Individual Risk Assessments */}
+          <div className="space-y-3">
+            {riskAssessments.map((assessment) => (
+              <div
+                key={assessment.individualId}
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3"
+              >
+                {/* Individual Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-sand">{assessment.individualName}</p>
+                    <p className="text-xs text-sand/60 mt-0.5">Risk Score: {assessment.overallScore} points</p>
+                  </div>
+                  <div className={`rounded-full px-3 py-1 text-xs font-semibold border ${getRiskColorClass(assessment.riskLevel)}`}>
+                    <div className="flex items-center gap-1">
+                      <ShieldAlert className="size-3" />
+                      {assessment.riskLevel} Risk
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Breakdown */}
+                {assessment.sectionBreakdown.some((section) => section.score > 0) && (
+                  <div className="space-y-2 pt-2 border-t border-white/10">
+                    <p className="text-xs text-sand/70 font-semibold">Section Breakdown:</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {assessment.sectionBreakdown
+                        .filter((section) => section.score > 0)
+                        .map((section) => (
+                          <div
+                            key={section.sectionRef}
+                            className="rounded-lg bg-midnight/40 border border-white/10 px-3 py-2"
+                          >
+                            <p className="text-xs text-sand/60">{section.sectionRef}</p>
+                            <p className="text-sm font-semibold text-sand">{section.score} pts</p>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Flagged Questions */}
+                {assessment.allFlaggedQuestions.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-white/10">
+                    <p className="text-xs text-sand/70 font-semibold">Flagged Concerns:</p>
+                    <div className="space-y-2">
+                      {assessment.allFlaggedQuestions.map((flagged, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg bg-midnight/40 border border-warning/20 px-3 py-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs text-sand flex-1">{flagged.questionText}</p>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                              flagged.riskWeight >= 10
+                                ? "bg-red-500/10 text-red-500"
+                                : flagged.riskWeight >= 5
+                                ? "bg-amber-500/10 text-amber-500"
+                                : "bg-yellow-500/10 text-yellow-500"
+                            }`}>
+                              {flagged.riskWeight} pts
+                            </span>
+                          </div>
+                          {flagged.details && (
+                            <p className="text-xs text-sand/60 mt-1 italic">{flagged.details}</p>
+                          )}
+                          {flagged.date && (
+                            <p className="text-xs text-sand/60 mt-1">Date: {flagged.date}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Export Actions */}
       <div className="rounded-2xl border border-emerald/30 bg-emerald/5 p-6 space-y-4">

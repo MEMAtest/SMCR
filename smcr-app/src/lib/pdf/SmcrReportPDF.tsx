@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { FirmProfile, Individual, FitnessResponse } from "@/lib/validation";
 import type { PrescribedResponsibility } from "@/lib/smcr-data";
+import { calculateAllRisks, getFirmRiskSummary } from "@/lib/fitness-risk-rating";
 
 // Define PDF styles matching the brand's premium aesthetic
 const styles = StyleSheet.create({
@@ -157,6 +158,49 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#6B7280",
   },
+  riskBadgeHigh: {
+    fontSize: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "#FEE2E2",
+    color: "#DC2626",
+    alignSelf: "flex-start",
+  },
+  riskBadgeMedium: {
+    fontSize: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "#FEF3C7",
+    color: "#F59E0B",
+    alignSelf: "flex-start",
+  },
+  riskBadgeLow: {
+    fontSize: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "#FEF9C3",
+    color: "#EAB308",
+    alignSelf: "flex-start",
+  },
+  riskBadgeClear: {
+    fontSize: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "#D1FAE5",
+    color: "#059669",
+    alignSelf: "flex-start",
+  },
+  riskItem: {
+    backgroundColor: "#FEF9F3",
+    padding: 8,
+    marginBottom: 6,
+    borderRadius: 4,
+    borderLeft: "2 solid #F59E0B",
+  },
 });
 
 export interface SmcrReportPDFProps {
@@ -182,6 +226,41 @@ export function SmcrReportPDF({
 
   const ownedResponsibilities = assignedResponsibilities.filter((pr) => responsibilityOwners[pr.ref]);
   const unassignedCount = assignedResponsibilities.length - ownedResponsibilities.length;
+
+  // Calculate risk assessments
+  const fitnessData: Record<string, Record<string, any>> = {};
+  fitnessResponses.forEach((response) => {
+    const parts = response.questionId.split("::");
+    if (parts.length === 3) {
+      const [individualId, , questionId] = parts;
+      if (!fitnessData[individualId]) {
+        fitnessData[individualId] = {};
+      }
+      fitnessData[individualId][questionId] = {
+        response: response.response,
+        details: response.details,
+        date: response.date,
+      };
+    }
+  });
+
+  const riskAssessments = calculateAllRisks(individuals, fitnessData);
+  const firmRiskSummary = getFirmRiskSummary(riskAssessments);
+
+  const getRiskBadgeStyle = (level: string) => {
+    switch (level) {
+      case "High":
+        return styles.riskBadgeHigh;
+      case "Medium":
+        return styles.riskBadgeMedium;
+      case "Low":
+        return styles.riskBadgeLow;
+      case "Clear":
+        return styles.riskBadgeClear;
+      default:
+        return styles.riskBadgeClear;
+    }
+  };
 
   return (
     <Document>
@@ -337,6 +416,107 @@ export function SmcrReportPDF({
                 );
               })}
             </View>
+          </>
+        )}
+
+        {/* Risk Assessment */}
+        {riskAssessments.length > 0 && (
+          <>
+            <Text style={styles.sectionHeader}>Fitness & Propriety Risk Assessment</Text>
+
+            {/* Firm-wide Risk Summary */}
+            <Text style={styles.subsectionHeader}>Firm-wide Risk Summary</Text>
+            <View style={styles.gridContainer}>
+              <View style={styles.gridItem}>
+                <Text style={styles.label}>Total Individuals</Text>
+                <Text style={styles.value}>{firmRiskSummary.total}</Text>
+              </View>
+              {firmRiskSummary.high > 0 && (
+                <View style={styles.gridItem}>
+                  <Text style={styles.label}>High Risk</Text>
+                  <Text style={[styles.value, { color: "#DC2626" }]}>{firmRiskSummary.high}</Text>
+                </View>
+              )}
+              {firmRiskSummary.medium > 0 && (
+                <View style={styles.gridItem}>
+                  <Text style={styles.label}>Medium Risk</Text>
+                  <Text style={[styles.value, { color: "#F59E0B" }]}>{firmRiskSummary.medium}</Text>
+                </View>
+              )}
+              {firmRiskSummary.low > 0 && (
+                <View style={styles.gridItem}>
+                  <Text style={styles.label}>Low Risk</Text>
+                  <Text style={[styles.value, { color: "#EAB308" }]}>{firmRiskSummary.low}</Text>
+                </View>
+              )}
+              {firmRiskSummary.clear > 0 && (
+                <View style={styles.gridItem}>
+                  <Text style={styles.label}>Clear</Text>
+                  <Text style={[styles.value, { color: "#059669" }]}>{firmRiskSummary.clear}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Individual Risk Assessments */}
+            <Text style={styles.subsectionHeader}>Individual Risk Assessments</Text>
+            {riskAssessments.map((assessment) => (
+              <View key={assessment.individualId} style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1A1B26" }}>
+                    {assessment.individualName}
+                  </Text>
+                  <Text style={getRiskBadgeStyle(assessment.riskLevel)}>
+                    {assessment.riskLevel} Risk ({assessment.overallScore} pts)
+                  </Text>
+                </View>
+
+                {/* Section Breakdown */}
+                {assessment.sectionBreakdown.some((section) => section.score > 0) && (
+                  <View style={{ marginTop: 8, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 9, color: "#6B7280", marginBottom: 4 }}>Section Breakdown:</Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {assessment.sectionBreakdown
+                        .filter((section) => section.score > 0)
+                        .map((section) => (
+                          <View key={section.sectionRef} style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 4, flex: 1 }}>
+                            <Text style={{ fontSize: 8, color: "#6B7280" }}>{section.sectionRef}</Text>
+                            <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1B26" }}>
+                              {section.score} pts
+                            </Text>
+                          </View>
+                        ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Flagged Questions */}
+                {assessment.allFlaggedQuestions.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ fontSize: 9, color: "#6B7280", marginBottom: 4 }}>Flagged Concerns:</Text>
+                    {assessment.allFlaggedQuestions.map((flagged, idx) => (
+                      <View key={idx} style={styles.riskItem}>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                          <Text style={{ fontSize: 8, color: "#1A1B26", flex: 1 }}>{flagged.questionText}</Text>
+                          <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: "#F59E0B" }}>
+                            {flagged.riskWeight} pts
+                          </Text>
+                        </View>
+                        {flagged.details && (
+                          <Text style={{ fontSize: 7, color: "#6B7280", fontStyle: "italic", marginTop: 2 }}>
+                            {flagged.details}
+                          </Text>
+                        )}
+                        {flagged.date && (
+                          <Text style={{ fontSize: 7, color: "#6B7280", marginTop: 2 }}>
+                            Date: {flagged.date}
+                          </Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ))}
           </>
         )}
 

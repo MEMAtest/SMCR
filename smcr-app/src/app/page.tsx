@@ -35,7 +35,7 @@ export default function Home() {
       <section className="hero-grid px-6 py-24 sm:py-32">
         <div className="mx-auto max-w-6xl grid gap-12 lg:grid-cols-[1.1fr_0.9fr] items-center">
           <div>
-            <p className="text-sm uppercase tracking-[0.4em] text-emerald mb-6">mema compliance studio</p>
+            <p className="text-sm uppercase tracking-[0.4em] text-emerald mb-6">MEMA Consultants</p>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-tight">
               Streamline your Senior Managers & <span className="text-emerald">Certification Regime</span>
             </h1>
