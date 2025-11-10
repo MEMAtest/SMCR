@@ -14,8 +14,19 @@ export async function getSession() {
  * Require authentication for an API route
  * Returns the session if authenticated, or returns an unauthorized response
  * Optionally applies rate limiting
+ *
+ * Can be disabled for development by setting DISABLE_AUTH=true in .env.local
  */
 export async function requireAuth(request?: Request, applyRateLimit = true) {
+  // Check if auth is disabled for development
+  if (process.env.DISABLE_AUTH === 'true') {
+    return {
+      authorized: true,
+      session: null,
+      userId: 'dev-user',
+    };
+  }
+
   // Apply rate limiting if request is provided
   if (applyRateLimit && request) {
     const identifier = getRateLimitIdentifier(request);
@@ -52,8 +63,19 @@ export async function requireAuth(request?: Request, applyRateLimit = true) {
  * Require admin role for an API route
  * Returns the session if user is admin, or returns a forbidden response
  * Applies strict rate limiting for admin endpoints
+ *
+ * Can be disabled for development by setting DISABLE_AUTH=true in .env.local
  */
 export async function requireAdmin(request?: Request) {
+  // Check if auth is disabled for development
+  if (process.env.DISABLE_AUTH === 'true') {
+    return {
+      authorized: true,
+      session: null,
+      userId: 'dev-admin',
+    };
+  }
+
   // Apply stricter rate limiting for admin endpoints
   if (request) {
     const identifier = getRateLimitIdentifier(request);
