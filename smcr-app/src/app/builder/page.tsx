@@ -1,3 +1,5 @@
+"use client";
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Share2 } from "lucide-react";
@@ -10,6 +12,7 @@ import { WizardShell } from "@/components/wizard/WizardShell";
 import { ReportSummaryPanel } from "@/components/reports/ReportSummaryPanel";
 import { BoardReport } from "@/components/reports/BoardReport";
 import { SaveDraftButton } from "@/components/wizard/SaveDraftButton";
+import { useSmcrStore } from "@/stores/useSmcrStore";
 
 // Configurable MEMA tool links via environment variables
 const memaTools = [
@@ -25,11 +28,9 @@ const memaTools = [
   },
 ];
 
-export const metadata: Metadata = {
-  title: "SMCR Builder · MEMA",
-};
-
 export default function BuilderPage() {
+  const activeStep = useSmcrStore((state) => state.activeStep);
+
   return (
     <main className="px-4 py-20 sm:px-8">
       <div className="mx-auto max-w-6xl space-y-10">
@@ -43,36 +44,44 @@ export default function BuilderPage() {
         </div>
 
         <WizardShell rightPanel={<ReportSummaryPanel />}>
-          <FirmProfileForm />
-          <ResponsibilitiesPreview />
-          <SmfRoster />
-          <ResponsibilityMatrix />
-          <FitnessChecklist />
-          <BoardReport />
-
-          <section className="glass-panel p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl">Connect with MEMA tools</h3>
-              <ArrowUpRight className="size-6 text-emerald" />
-            </div>
-            <p className="text-sm text-sand/70">
-              Use the same data spine to open contextual experiences in the MEMA suite. These will share auth +
-              payloads once the API contract is finalised.
-            </p>
-            <div className="grid gap-4">
-              {memaTools.map((tool) => (
-                <Link
-                  key={tool.name}
-                  href={tool.href}
-                  target="_blank"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-emerald/50"
-                >
-                  <p className="font-semibold">{tool.name}</p>
-                  <p className="text-sm text-sand/70">{tool.description}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
+          {/* Conditional rendering - show only active step */}
+          {activeStep === "firm" && <FirmProfileForm />}
+          {activeStep === "responsibilities" && (
+            <>
+              <ResponsibilitiesPreview />
+              <SmfRoster />
+              <ResponsibilityMatrix />
+            </>
+          )}
+          {activeStep === "fitness" && <FitnessChecklist />}
+          {activeStep === "reports" && (
+            <>
+              <BoardReport />
+              <section className="glass-panel p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl">Connect with MEMA tools</h3>
+                  <ArrowUpRight className="size-6 text-emerald" />
+                </div>
+                <p className="text-sm text-sand/70">
+                  Use the same data spine to open contextual experiences in the MEMA suite. These will share auth +
+                  payloads once the API contract is finalised.
+                </p>
+                <div className="grid gap-4">
+                  {memaTools.map((tool) => (
+                    <Link
+                      key={tool.name}
+                      href={tool.href}
+                      target="_blank"
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-emerald/50"
+                    >
+                      <p className="font-semibold">{tool.name}</p>
+                      <p className="text-sm text-sand/70">{tool.description}</p>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
           <SaveDraftButton />
         </WizardShell>
       </div>

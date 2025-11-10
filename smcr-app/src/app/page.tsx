@@ -35,7 +35,7 @@ export default function Home() {
           <div>
             <p className="text-sm uppercase tracking-[0.4em] text-emerald mb-6">mema compliance studio</p>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl leading-tight">
-              Precision SMCR workflows with a <span className="text-emerald">premium</span> calm finish
+              Streamline your Senior Managers & <span className="text-emerald">Certification Regime</span>
             </h1>
             <p className="mt-6 text-lg text-cloud/90 max-w-2xl">
               Orchestrate your Senior Managers & Certification Regime from firm profile through board-ready
