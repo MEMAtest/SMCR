@@ -122,24 +122,6 @@ export async function PUT(
         .where(eq(firms.id, firmId));
     }
 
-    // Delete and re-insert responsibilities
-    await db.delete(responsibilities).where(eq(responsibilities.firmId, firmId));
-    if (responsibilityRefs && responsibilityRefs.length > 0) {
-      const rows = responsibilityRefs
-        .filter((ref: string) => responsibilityMap.has(ref))
-        .map((ref: string) => ({
-          firmId,
-          reference: ref,
-          title: responsibilityMap.get(ref) ?? ref,
-          status: "assigned",
-          ownerId: responsibilityOwners?.[ref] || null,
-        }));
-
-      if (rows.length > 0) {
-        await db.insert(responsibilities).values(rows);
-      }
-    }
-
     // Get existing individuals to delete their fitness assessments
     const existingIndividuals = await db.select().from(individuals).where(eq(individuals.firmId, firmId));
     const existingIndividualIds = existingIndividuals.map((i) => i.id);
@@ -149,8 +131,11 @@ export async function PUT(
       await db.delete(fitnessAssessments).where(inArray(fitnessAssessments.individualId, existingIndividualIds));
     }
 
-    // Delete and re-insert individuals
+    // Delete existing data
+    await db.delete(responsibilities).where(eq(responsibilities.firmId, firmId));
     await db.delete(individuals).where(eq(individuals.firmId, firmId));
+
+    // Insert individuals FIRST and capture UUID mapping
     const newIndividualIds: Record<string, string> = {}; // Map payload ID to DB UUID
 
     if (indivs && indivs.length > 0) {
@@ -168,6 +153,28 @@ export async function PUT(
         if (inserted) {
           newIndividualIds[ind.id] = inserted.id; // Map old ID to new UUID
         }
+      }
+    }
+
+    // Now insert responsibilities with mapped owner IDs
+    if (responsibilityRefs && responsibilityRefs.length > 0) {
+      const rows = responsibilityRefs
+        .filter((ref: string) => responsibilityMap.has(ref))
+        .map((ref: string) => {
+          const tempOwnerId = responsibilityOwners?.[ref];
+          const mappedOwnerId = tempOwnerId ? newIndividualIds[tempOwnerId] : null;
+
+          return {
+            firmId,
+            reference: ref,
+            title: responsibilityMap.get(ref) ?? ref,
+            status: "assigned",
+            ownerId: mappedOwnerId || null,
+          };
+        });
+
+      if (rows.length > 0) {
+        await db.insert(responsibilities).values(rows);
       }
     }
 
