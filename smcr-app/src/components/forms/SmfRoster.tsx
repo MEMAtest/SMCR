@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useSmcrStore } from "@/stores/useSmcrStore";
-import { UserPlus, Trash2, Users, Info } from "lucide-react";
+import { UserPlus, Trash2, Users, Info, Pencil } from "lucide-react";
 import type { Individual } from "@/lib/validation";
 import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 import { getApplicableSMFs } from "@/lib/smcr-data";
@@ -23,6 +23,7 @@ export function SmfRoster() {
   }, [firmProfile.firmType, firmProfile.smcrCategory]);
 
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [newIndividual, setNewIndividual] = useState({
     name: "",
     smfRoles: [] as string[],
@@ -34,20 +35,42 @@ export function SmfRoster() {
       return;
     }
 
-    const individual: Individual = {
-      id: `ind-${Date.now()}`,
-      name: newIndividual.name.trim(),
-      smfRoles: newIndividual.smfRoles,
-      email: newIndividual.email.trim() || undefined,
-    };
+    if (editingId) {
+      // Update existing individual
+      updateIndividual(editingId, {
+        name: newIndividual.name.trim(),
+        smfRoles: newIndividual.smfRoles,
+        email: newIndividual.email.trim() || undefined,
+      });
+      setEditingId(null);
+    } else {
+      // Add new individual
+      const individual: Individual = {
+        id: `ind-${Date.now()}`,
+        name: newIndividual.name.trim(),
+        smfRoles: newIndividual.smfRoles,
+        email: newIndividual.email.trim() || undefined,
+      };
+      addIndividual(individual);
+    }
 
-    addIndividual(individual);
     setNewIndividual({ name: "", smfRoles: [], email: "" });
     setIsAdding(false);
   };
 
+  const handleEdit = (individual: Individual) => {
+    setNewIndividual({
+      name: individual.name,
+      smfRoles: individual.smfRoles,
+      email: individual.email || "",
+    });
+    setEditingId(individual.id);
+    setIsAdding(true);
+  };
+
   const handleCancel = () => {
     setNewIndividual({ name: "", smfRoles: [], email: "" });
+    setEditingId(null);
     setIsAdding(false);
   };
 
@@ -93,14 +116,24 @@ export function SmfRoster() {
               </div>
               {individual.email && <p className="text-xs text-sand/50 mt-1">{individual.email}</p>}
             </div>
-            <button
-              type="button"
-              onClick={() => removeIndividual(individual.id)}
-              className="text-warning hover:text-warning/80 transition ml-4"
-              aria-label={`Remove ${individual.name}`}
-            >
-              <Trash2 className="size-5" />
-            </button>
+            <div className="flex gap-2 ml-4">
+              <button
+                type="button"
+                onClick={() => handleEdit(individual)}
+                className="text-emerald hover:text-emerald/80 transition"
+                aria-label={`Edit ${individual.name}`}
+              >
+                <Pencil className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => removeIndividual(individual.id)}
+                className="text-warning hover:text-warning/80 transition"
+                aria-label={`Remove ${individual.name}`}
+              >
+                <Trash2 className="size-5" />
+              </button>
+            </div>
           </div>
         ))}
 
@@ -188,7 +221,7 @@ export function SmfRoster() {
               onClick={handleAdd}
               className="flex-1 rounded-full bg-emerald/90 text-midnight px-4 py-2 font-semibold hover:bg-emerald transition"
             >
-              Add Individual
+              {editingId ? 'Update Individual' : 'Add Individual'}
             </button>
             <button
               type="button"
@@ -209,8 +242,6 @@ export function SmfRoster() {
           Add SMF Individual
         </button>
       )}
-
-      <WizardNavigation currentStep="responsibilities" showErrors />
     </div>
   );
 }

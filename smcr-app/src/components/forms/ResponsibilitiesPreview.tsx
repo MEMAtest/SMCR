@@ -55,7 +55,6 @@ export function ResponsibilitiesPreview() {
             We need your firm type and SMCR category to show relevant responsibilities
           </p>
         </div>
-        <WizardNavigation currentStep="responsibilities" showErrors />
       </div>
     );
   }
@@ -152,8 +151,6 @@ export function ResponsibilitiesPreview() {
           ))}
         </div>
       )}
-
-      <WizardNavigation currentStep="responsibilities" showErrors />
     </div>
   );
 }
