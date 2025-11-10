@@ -3,6 +3,7 @@ import { eq, sql, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db";
 import { firms, responsibilities, individuals, fitnessAssessments } from "@/lib/schema";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
+import { requireAuth } from "@/lib/auth-helpers";
 
 const responsibilityMap = new Map(
   PRESCRIBED_RESPONSIBILITIES.map((item) => [item.ref, item.text])
@@ -10,11 +11,18 @@ const responsibilityMap = new Map(
 
 /**
  * GET /api/firms/[id] - Retrieve a specific firm with all related data
+ * SECURITY: Requires authentication
  */
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Require authentication with rate limiting
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
+  }
+
   const db = getDb();
   const firmId = params.id;
 
@@ -89,11 +97,18 @@ export async function GET(
 
 /**
  * PUT /api/firms/[id] - Update an existing firm
+ * SECURITY: Requires authentication
  */
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Require authentication with rate limiting
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
+  }
+
   const db = getDb();
   const firmId = params.id;
 
@@ -230,11 +245,18 @@ export async function PUT(
 
 /**
  * DELETE /api/firms/[id] - Delete a firm and all related data
+ * SECURITY: Requires authentication
  */
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  // Require authentication with rate limiting
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
+  }
+
   const db = getDb();
   const firmId = params.id;
 

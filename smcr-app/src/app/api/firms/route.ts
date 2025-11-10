@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { firms, responsibilities, individuals, fitnessAssessments } from "@/lib/schema";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
 import type { Individual, FitnessResponse } from "@/lib/validation";
+import { requireAuth } from "@/lib/auth-helpers";
 
 const responsibilityMap = new Map(
   PRESCRIBED_RESPONSIBILITIES.map((item) => [item.ref, item.text])
@@ -25,6 +26,12 @@ type FirmPayload = {
 };
 
 export async function POST(request: Request) {
+  // Require authentication with rate limiting
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
+  }
+
   const db = getDb();
   let payload: FirmPayload;
 
@@ -154,12 +161,20 @@ export async function POST(request: Request) {
 }
 
 /**
- * GET /api/firms - List all firms (simplified, no auth yet)
+ * GET /api/firms - List all firms for authenticated user
+ * SECURITY: Requires authentication
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Require authentication with rate limiting
+  const auth = await requireAuth(request);
+  if (!auth.authorized) {
+    return auth.response;
+  }
+
   const db = getDb();
 
   try {
+    // TODO: In future, filter firms by user ownership
     const allFirms = await db.select().from(firms).orderBy(firms.createdAt);
 
     return NextResponse.json({

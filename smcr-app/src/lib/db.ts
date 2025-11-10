@@ -21,3 +21,11 @@ export function getDb() {
 
   return global.__db;
 }
+
+// Export a singleton instance for NextAuth adapter
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not set");
+}
+const client = neon(connectionString);
+export const db = drizzle(client, { schema });

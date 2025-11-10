@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+import { requireAdmin } from "@/lib/auth-helpers";
 
 /**
  * POST /api/migrate - Run database migrations
+ * SECURITY: Admin-only endpoint - requires authenticated admin user
  * This endpoint migrates the database schema to support multiple SMF roles
  */
 export async function POST(request: Request) {
+  // Require admin authentication with rate limiting
+  const auth = await requireAdmin(request);
+  if (!auth.authorized) {
+    return auth.response;
+  }
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const results: string[] = [];
