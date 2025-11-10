@@ -5,6 +5,7 @@ import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
 import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { generateAndDownloadPDF, generatePDFFilename } from "@/lib/pdf/generatePDF";
+import { exportResponsibilitiesCSV } from "@/lib/csv/generateCSV";
 
 export function BoardReport() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
@@ -67,6 +68,23 @@ export function BoardReport() {
       alert("Failed to export PDF. Please try again.");
     } finally {
       setIsExportingPDF(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      setIsExportingCSV(true);
+      exportResponsibilitiesCSV(
+        assignedResponsibilities,
+        responsibilityOwners,
+        individuals,
+        firmProfile.firmName
+      );
+    } catch (error) {
+      console.error("CSV export failed:", error);
+      alert("Failed to export CSV. Please try again.");
+    } finally {
+      setIsExportingCSV(false);
     }
   };
 
@@ -288,11 +306,21 @@ export function BoardReport() {
           </button>
           <button
             type="button"
-            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2"
-            onClick={() => alert("CSV export coming soon")}
+            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleExportCSV}
+            disabled={isExportingCSV}
           >
-            <Download className="size-4" />
-            Export CSV
+            {isExportingCSV ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating CSV...
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Export CSV
+              </>
+            )}
           </button>
           <button
             type="button"
