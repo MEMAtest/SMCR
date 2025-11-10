@@ -49,8 +49,8 @@ export default function BuilderPage() {
 
         <WizardShell rightPanel={<ReportSummaryPanel />}>
           <FirmProfileForm />
-          <ResponsibilitiesPreview />
           <SmfRoster />
+          <ResponsibilitiesPreview />
           <ResponsibilityMatrix />
           <FitnessChecklist />
           <BoardReport />
