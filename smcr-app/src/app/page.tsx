@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, ShieldCheck, PieChart, Sparkles } from "lucide-react";
 import { HealthPreview } from "@/components/landing/HealthPreview";
+import { MemaToolsSection } from "@/components/landing/MemaToolsSection";
 
 const proofPoints = [
   {
@@ -74,7 +75,7 @@ export default function Home() {
       </section>
 
       <section className="bg-mist/5 py-20">
-        <div className="mx-auto max-w-6xl px-6">
+        <div className="mx-auto max-w-6xl px-6 space-y-8">
           <div className="grid gap-6 md:grid-cols-3">
             {proofPoints.map((point) => (
               <div key={point.title} className="glass-panel p-6">
@@ -84,6 +85,7 @@ export default function Home() {
               </div>
             ))}
           </div>
+          <MemaToolsSection />
         </div>
       </section>
 

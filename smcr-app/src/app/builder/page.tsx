@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowUpRight, Share2 } from "lucide-react";
+import { ArrowLeft, Share2 } from "lucide-react";
 import { FirmProfileForm } from "@/components/forms/FirmProfileForm";
 import { ResponsibilitiesPreview } from "@/components/forms/ResponsibilitiesPreview";
 import { SmfRoster } from "@/components/forms/SmfRoster";
@@ -14,20 +14,6 @@ import { SaveDraftButton } from "@/components/wizard/SaveDraftButton";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { DraftLoader } from "@/components/wizard/DraftLoader";
 import { Suspense } from "react";
-
-// Configurable MEMA tool links via environment variables
-const memaTools = [
-  {
-    name: "Vulnerability heatmap",
-    href: process.env.NEXT_PUBLIC_MEMA_VULNERABILITY_URL || "https://vulnerability.memaconsultants.com",
-    description: "Push flagged SMFs for deeper conduct analytics.",
-  },
-  {
-    name: "FCA fines tracker",
-    href: process.env.NEXT_PUBLIC_MEMA_FINES_URL || "https://fcafines.memaconsultants.com",
-    description: "Benchmark exposure against current enforcement actions.",
-  },
-];
 
 export default function BuilderPage() {
   const activeStep = useSmcrStore((state) => state.activeStep);
@@ -58,34 +44,7 @@ export default function BuilderPage() {
             </>
           )}
           {activeStep === "fitness" && <FitnessChecklist />}
-          {activeStep === "reports" && (
-            <>
-              <BoardReport />
-              <section className="glass-panel p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-2xl">Connect with MEMA tools</h3>
-                  <ArrowUpRight className="size-6 text-emerald" />
-                </div>
-                <p className="text-sm text-sand/70">
-                  Use the same data spine to open contextual experiences in the MEMA suite. These will share auth +
-                  payloads once the API contract is finalised.
-                </p>
-                <div className="grid gap-4">
-                  {memaTools.map((tool) => (
-                    <Link
-                      key={tool.name}
-                      href={tool.href}
-                      target="_blank"
-                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:border-emerald/50"
-                    >
-                      <p className="font-semibold">{tool.name}</p>
-                      <p className="text-sm text-sand/70">{tool.description}</p>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            </>
-          )}
+          {activeStep === "reports" && <BoardReport />}
           <SaveDraftButton />
         </WizardShell>
       </div>

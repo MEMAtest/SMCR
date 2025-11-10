@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   DEFAULT_STEPS,
   PRESCRIBED_RESPONSIBILITIES,
+  getApplicablePRs,
   type FirmTypeKey,
   type JourneyStepKey,
 } from "@/lib/smcr-data";
@@ -123,10 +124,20 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
   },
 
   getResponsibilityCoverage: () => {
-    const assignments = get().responsibilityAssignments;
-    const total = PRESCRIBED_RESPONSIBILITIES.length;
+    const state = get();
+    const assignments = state.responsibilityAssignments;
+    const { firmType, smcrCategory, isCASSFirm } = state.firmProfile;
+
+    // Get only applicable PRs based on firm profile
+    const applicablePRs = firmType && smcrCategory
+      ? getApplicablePRs(firmType, smcrCategory, isCASSFirm || false)
+      : PRESCRIBED_RESPONSIBILITIES;
+
+    const total = applicablePRs.length;
     if (!total) return 0;
-    const complete = Object.values(assignments).filter(Boolean).length;
+
+    // Count only applicable PRs that are assigned
+    const complete = applicablePRs.filter((pr) => assignments[pr.ref]).length;
     return Math.round((complete / total) * 100);
   },
 
