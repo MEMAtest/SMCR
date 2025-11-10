@@ -22,7 +22,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MEMA SMCR Studio",
+  title: "MEMA Consultants",
   description:
     "Design, evidence, and export Senior Managers & Certification Regime packs with a premium guided experience.",
 };

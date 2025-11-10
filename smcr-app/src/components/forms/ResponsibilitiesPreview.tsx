@@ -29,7 +29,7 @@ export function ResponsibilitiesPreview() {
   // Auto-check mandatory PRs when they first appear
   useEffect(() => {
     mandatoryPRs.forEach((pr) => {
-      if (assignments[pr.ref] === undefined) {
+      if (!assignments[pr.ref]) {
         setAssignment(pr.ref, true);
       }
     });
