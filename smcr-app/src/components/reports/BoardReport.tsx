@@ -2,8 +2,10 @@
 
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
-import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield } from "lucide-react";
-import { useMemo } from "react";
+import { FileText, Download, Share2, CheckCircle2, AlertCircle, Users, Shield, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { generateAndDownloadPDF, generatePDFFilename } from "@/lib/pdf/generatePDF";
+import { exportResponsibilitiesCSV } from "@/lib/csv/generateCSV";
 
 export function BoardReport() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
@@ -12,6 +14,9 @@ export function BoardReport() {
   const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
   const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
   const validateStep = useSmcrStore((state) => state.validateStep);
+
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
 
   // Calculate completeness
   const firmValidation = validateStep("firm");
@@ -44,6 +49,45 @@ export function BoardReport() {
     };
   }, [firmValidation, respValidation, fitnessValidation, individuals.length, ownedResponsibilities.length]);
 
+  const handleExportPDF = async () => {
+    try {
+      setIsExportingPDF(true);
+      const filename = generatePDFFilename(firmProfile.firmName);
+      await generateAndDownloadPDF(
+        {
+          firmProfile,
+          individuals,
+          assignedResponsibilities,
+          responsibilityOwners,
+          fitnessResponses,
+        },
+        filename
+      );
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      setIsExportingCSV(true);
+      exportResponsibilitiesCSV(
+        assignedResponsibilities,
+        responsibilityOwners,
+        individuals,
+        firmProfile.firmName
+      );
+    } catch (error) {
+      console.error("CSV export failed:", error);
+      alert("Failed to export CSV. Please try again.");
+    } finally {
+      setIsExportingCSV(false);
+    }
+  };
+
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -63,20 +107,48 @@ export function BoardReport() {
       </div>
 
       {/* Completion Overview */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-4">
+      <div className={`rounded-2xl border p-6 space-y-4 transition-all duration-500 ${
+        completionStats.percentage === 100
+          ? "border-emerald/50 bg-gradient-to-br from-emerald/10 via-emerald/5 to-transparent shadow-lg shadow-emerald/20"
+          : "border-white/10 bg-white/5"
+      }`}>
         <div className="flex items-center justify-between">
           <h4 className="text-xl font-semibold">Journey Completion</h4>
-          <div className="text-3xl font-bold text-emerald">{completionStats.percentage}%</div>
+          <div className={`text-3xl font-bold transition-all duration-500 ${
+            completionStats.percentage === 100 ? "text-emerald scale-110" : "text-emerald"
+          }`}>
+            {completionStats.percentage}%
+          </div>
         </div>
-        <div className="h-3 rounded-full bg-midnight/60 overflow-hidden">
+        <div className="relative h-3 rounded-full bg-midnight/60 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald to-emerald/80 transition-all duration-500"
+            className={`h-full bg-gradient-to-r transition-all duration-1000 ease-out ${
+              completionStats.percentage === 100
+                ? "from-emerald via-emerald to-emerald animate-pulse"
+                : "from-emerald to-emerald/80"
+            }`}
             style={{ width: `${completionStats.percentage}%` }}
           />
+          {completionStats.percentage === 100 && (
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+          )}
         </div>
-        <p className="text-sm text-sand/70">
-          {completionStats.complete} of {completionStats.total} key sections completed
-        </p>
+        {completionStats.percentage === 100 ? (
+          <div className="rounded-xl border border-emerald/30 bg-emerald/5 px-4 py-3 flex items-center gap-3">
+            <CheckCircle2 className="size-5 text-emerald animate-bounce" />
+            <div>
+              <p className="text-sm font-semibold text-emerald">Congratulations!</p>
+              <p className="text-xs text-emerald/80">Your SMCR compliance framework is complete and ready for board submission.</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-sand/70">
+            {completionStats.complete} of {completionStats.total} key sections completed
+            {completionStats.percentage >= 75 && (
+              <span className="ml-2 text-emerald">• Almost there!</span>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Firm Profile Summary */}
@@ -244,19 +316,39 @@ export function BoardReport() {
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2"
-            onClick={() => alert("PDF export coming soon")}
+            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleExportPDF}
+            disabled={isExportingPDF}
           >
-            <Download className="size-4" />
-            Export PDF
+            {isExportingPDF ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating PDF...
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Export PDF
+              </>
+            )}
           </button>
           <button
             type="button"
-            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2"
-            onClick={() => alert("CSV export coming soon")}
+            className="rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleExportCSV}
+            disabled={isExportingCSV}
           >
-            <Download className="size-4" />
-            Export CSV
+            {isExportingCSV ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Generating CSV...
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                Export CSV
+              </>
+            )}
           </button>
           <button
             type="button"

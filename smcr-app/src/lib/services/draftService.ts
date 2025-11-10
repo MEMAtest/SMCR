@@ -1,7 +1,7 @@
 /**
  * Draft Service - Abstraction layer for SMCR draft persistence
  *
- * This service hides the actual storage backend (currently Neon Postgres,
+ * This service hides the actual storage backend (currently managed Postgres,
  * but could be swapped for other providers) from the UI layer.
  *
  * The UI calls saveDraft() and loadDraft() without knowing the provider details.

@@ -2,63 +2,105 @@
 
 import { FIT_SECTIONS } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
-import { CheckCircle2, User, ChevronDown } from "lucide-react";
+import { CheckCircle2, User, ChevronDown, Info, AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
+import type { FitnessResponse } from "@/lib/validation";
 
 export function FitnessChecklist() {
   const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
   const setFitnessResponse = useSmcrStore((state) => state.setFitnessResponse);
   const individuals = useSmcrStore((state) => state.individuals);
   const [expandedIndividual, setExpandedIndividual] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   // Generate unique questionId that includes individual ID
-  const generateQuestionId = (individualId: string, sectionId: string, questionIndex: number) => {
-    return `${individualId}::${sectionId}::${questionIndex}`;
+  const generateQuestionId = (individualId: string, sectionId: string, questionId: string) => {
+    return `${individualId}::${sectionId}::${questionId}`;
   };
 
   const parseQuestionId = (questionId: string) => {
-    const [individualId, sectionId, questionIndex] = questionId.split("::");
-    return { individualId, sectionId, questionIndex };
+    const [individualId, sectionId, qId] = questionId.split("::");
+    return { individualId, sectionId, questionId: qId };
   };
 
-  const getResponseValue = (individualId: string, sectionId: string, questionIndex: number) => {
-    const questionId = generateQuestionId(individualId, sectionId, questionIndex);
-    const response = fitnessResponses.find((r) => r.questionId === questionId);
-    return response?.response || "";
-  };
-
-  const getEvidenceValue = (individualId: string, sectionId: string, questionIndex: number) => {
-    const questionId = generateQuestionId(individualId, sectionId, questionIndex);
-    const response = fitnessResponses.find((r) => r.questionId === questionId);
-    return response?.evidence || "";
+  const getResponse = (individualId: string, sectionId: string, questionId: string): FitnessResponse | undefined => {
+    const fullQuestionId = generateQuestionId(individualId, sectionId, questionId);
+    return fitnessResponses.find((r) => r.questionId === fullQuestionId);
   };
 
   const handleResponseChange = (
     individualId: string,
     sectionId: string,
-    questionIndex: number,
-    value: string
+    questionId: string,
+    value: "yes" | "no" | "n/a"
   ) => {
-    const questionId = generateQuestionId(individualId, sectionId, questionIndex);
+    const fullQuestionId = generateQuestionId(individualId, sectionId, questionId);
+    const existing = getResponse(individualId, sectionId, questionId);
+
     setFitnessResponse({
       sectionId,
-      questionId,
+      questionId: fullQuestionId,
       response: value,
-      evidence: getEvidenceValue(individualId, sectionId, questionIndex),
+      details: existing?.details,
+      date: existing?.date,
+      evidence: existing?.evidence,
+    });
+  };
+
+  const handleDetailsChange = (
+    individualId: string,
+    sectionId: string,
+    questionId: string,
+    value: string
+  ) => {
+    const fullQuestionId = generateQuestionId(individualId, sectionId, questionId);
+    const existing = getResponse(individualId, sectionId, questionId);
+
+    setFitnessResponse({
+      sectionId,
+      questionId: fullQuestionId,
+      response: existing?.response || "",
+      details: value,
+      date: existing?.date,
+      evidence: existing?.evidence,
+    });
+  };
+
+  const handleDateChange = (
+    individualId: string,
+    sectionId: string,
+    questionId: string,
+    value: string
+  ) => {
+    const fullQuestionId = generateQuestionId(individualId, sectionId, questionId);
+    const existing = getResponse(individualId, sectionId, questionId);
+
+    setFitnessResponse({
+      sectionId,
+      questionId: fullQuestionId,
+      response: existing?.response || "",
+      details: existing?.details,
+      date: value,
+      evidence: existing?.evidence,
     });
   };
 
   const handleEvidenceChange = (
     individualId: string,
     sectionId: string,
-    questionIndex: number,
+    questionId: string,
     value: string
   ) => {
-    const questionId = generateQuestionId(individualId, sectionId, questionIndex);
+    const fullQuestionId = generateQuestionId(individualId, sectionId, questionId);
+    const existing = getResponse(individualId, sectionId, questionId);
+
     setFitnessResponse({
       sectionId,
-      questionId,
-      response: getResponseValue(individualId, sectionId, questionIndex),
+      questionId: fullQuestionId,
+      response: existing?.response || "",
+      details: existing?.details,
+      date: existing?.date,
       evidence: value,
     });
   };
@@ -68,9 +110,27 @@ export function FitnessChecklist() {
     const totalQuestions = FIT_SECTIONS.reduce((sum, section) => sum + section.questions.length, 0);
     const answered = fitnessResponses.filter((r) => {
       const parsed = parseQuestionId(r.questionId);
-      return parsed.individualId === individualId && r.response.trim().length > 0;
+      return parsed.individualId === individualId && r.response && r.response.trim().length > 0;
     }).length;
     return totalQuestions > 0 ? Math.round((answered / totalQuestions) * 100) : 0;
+  };
+
+  // Calculate completion per section for an individual
+  const getSectionCompletion = (individualId: string, sectionId: string) => {
+    const section = FIT_SECTIONS.find((s) => s.id === sectionId);
+    if (!section) return 0;
+
+    const totalQuestions = section.questions.length;
+    const answered = section.questions.filter((q) => {
+      const response = getResponse(individualId, sectionId, q.id);
+      return response && response.response && response.response.trim().length > 0;
+    }).length;
+
+    return totalQuestions > 0 ? Math.round((answered / totalQuestions) * 100) : 0;
+  };
+
+  const toggleSection = (key: string) => {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
@@ -87,7 +147,8 @@ export function FitnessChecklist() {
       </p>
 
       {individuals.length === 0 ? (
-        <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3">
+        <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-8 text-center">
+          <AlertCircle className="size-12 text-warning mx-auto mb-3" />
           <p className="text-sm text-warning">Add SMF individuals in step 02 to complete fitness assessments.</p>
         </div>
       ) : (
@@ -97,11 +158,11 @@ export function FitnessChecklist() {
             const isExpanded = expandedIndividual === individual.id;
 
             return (
-              <div key={individual.id} className="rounded-2xl border border-white/10 bg-white/5">
+              <div key={individual.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setExpandedIndividual(isExpanded ? null : individual.id)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition rounded-2xl"
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition"
                 >
                   <div className="flex items-center gap-3">
                     <User className="size-5 text-emerald" />
@@ -123,42 +184,160 @@ export function FitnessChecklist() {
                 </button>
 
                 {isExpanded && (
-                  <div className="px-4 pb-4 space-y-4 border-t border-white/10 pt-4">
-                    {FIT_SECTIONS.map((section) => (
-                      <div key={section.id} className="space-y-3">
-                        <h4 className="text-base font-semibold text-sand border-l-2 border-emerald pl-3">
-                          {section.title}
-                        </h4>
-                        {section.questions.map((question, questionIndex) => (
-                          <div key={questionIndex} className="space-y-2 pl-5">
-                            <label className="block text-sm text-sand/80">
-                              {question}
-                              <textarea
-                                className="mt-2 w-full rounded-2xl border border-white/20 bg-midnight/60 px-4 py-3 text-sand focus:border-emerald focus:outline-none"
-                                placeholder="Add your response"
-                                rows={3}
-                                value={getResponseValue(individual.id, section.id, questionIndex)}
-                                onChange={(e) =>
-                                  handleResponseChange(individual.id, section.id, questionIndex, e.target.value)
-                                }
+                  <div className="border-t border-white/10">
+                    {FIT_SECTIONS.map((section) => {
+                      const sectionKey = `${individual.id}::${section.id}`;
+                      const isSectionExpanded = expandedSections[sectionKey];
+                      const sectionCompletion = getSectionCompletion(individual.id, section.id);
+
+                      return (
+                        <div key={section.id} className="border-b border-white/10 last:border-b-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(sectionKey)}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition text-left"
+                          >
+                            <div className="flex-1">
+                              <h4 className="text-sm font-semibold text-sand">{section.title}</h4>
+                              <p className="text-xs text-sand/60 mt-0.5">{section.questions.length} questions</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs font-semibold ${
+                                sectionCompletion === 100 ? "text-emerald" : "text-sand/70"
+                              }`}>
+                                {sectionCompletion}%
+                              </span>
+                              <ChevronDown
+                                className={`size-4 text-sand/70 transition-transform ${
+                                  isSectionExpanded ? "rotate-180" : ""
+                                }`}
                               />
-                            </label>
-                            <label className="block text-xs text-sand/60">
-                              Evidence link (optional)
-                              <input
-                                type="text"
-                                className="mt-1 w-full rounded-2xl border border-white/20 bg-midnight/60 px-4 py-2 text-sm text-sand focus:border-emerald focus:outline-none"
-                                placeholder="https://..."
-                                value={getEvidenceValue(individual.id, section.id, questionIndex)}
-                                onChange={(e) =>
-                                  handleEvidenceChange(individual.id, section.id, questionIndex, e.target.value)
-                                }
-                              />
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                            </div>
+                          </button>
+
+                          {isSectionExpanded && (
+                            <div className="px-4 pb-4 space-y-4 bg-midnight/30">
+                              {section.questions.map((question) => {
+                                const response = getResponse(individual.id, section.id, question.id);
+                                const selectedValue = response?.response || "";
+                                const showDetails = selectedValue === "yes" && question.requiresDetails;
+                                const showDate = selectedValue === "yes" && question.requiresDate;
+
+                                return (
+                                  <div
+                                    key={question.id}
+                                    className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3"
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      <p className="text-sm text-sand flex-1">{question.question}</p>
+                                      {question.helpText && (
+                                        <div className="group relative">
+                                          <Info className="size-4 text-sand/40 cursor-help" />
+                                          <div className="absolute right-0 top-6 w-64 rounded-lg bg-midnight border border-white/20 p-3 text-xs text-sand/80 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition z-10">
+                                            {question.helpText}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Radio buttons for Yes/No/N/A */}
+                                    <div className="flex gap-3">
+                                      {["yes", "no", "n/a"].map((option) => (
+                                        <label
+                                          key={option}
+                                          className={`flex-1 flex items-center justify-center gap-2 rounded-full border px-4 py-2 cursor-pointer transition ${
+                                            selectedValue === option
+                                              ? option === "yes"
+                                                ? "border-emerald bg-emerald/10 text-emerald"
+                                                : option === "no"
+                                                ? "border-warning bg-warning/10 text-warning"
+                                                : "border-sand/50 bg-sand/10 text-sand"
+                                              : "border-white/20 text-sand/70 hover:border-white/40"
+                                          }`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name={`${individual.id}-${section.id}-${question.id}`}
+                                            value={option}
+                                            checked={selectedValue === option}
+                                            onChange={() =>
+                                              handleResponseChange(
+                                                individual.id,
+                                                section.id,
+                                                question.id,
+                                                option as "yes" | "no" | "n/a"
+                                              )
+                                            }
+                                            className="sr-only"
+                                          />
+                                          <span className="text-sm font-semibold capitalize">{option}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+
+                                    {/* Conditional details field */}
+                                    {showDetails && (
+                                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <label className="block text-xs text-sand/80">
+                                          Please provide details
+                                          <textarea
+                                            className="mt-1 w-full rounded-2xl border border-emerald/30 bg-midnight/60 px-4 py-2 text-sm text-sand focus:border-emerald focus:outline-none"
+                                            placeholder="Add details about this response..."
+                                            rows={3}
+                                            value={response?.details || ""}
+                                            onChange={(e) =>
+                                              handleDetailsChange(
+                                                individual.id,
+                                                section.id,
+                                                question.id,
+                                                e.target.value
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                      </div>
+                                    )}
+
+                                    {/* Conditional date field */}
+                                    {showDate && (
+                                      <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <label className="block text-xs text-sand/80">
+                                          Date of event
+                                          <input
+                                            type="date"
+                                            className="mt-1 w-full rounded-2xl border border-emerald/30 bg-midnight/60 px-4 py-2 text-sm text-sand focus:border-emerald focus:outline-none"
+                                            value={response?.date || ""}
+                                            onChange={(e) =>
+                                              handleDateChange(individual.id, section.id, question.id, e.target.value)
+                                            }
+                                          />
+                                        </label>
+                                      </div>
+                                    )}
+
+                                    {/* Evidence field (always shown) */}
+                                    <div className="space-y-2">
+                                      <label className="block text-xs text-sand/60">
+                                        Evidence link or reference (optional)
+                                        <input
+                                          type="text"
+                                          className="mt-1 w-full rounded-2xl border border-white/20 bg-midnight/60 px-4 py-2 text-sm text-sand focus:border-emerald focus:outline-none"
+                                          placeholder="https://... or document reference"
+                                          value={response?.evidence || ""}
+                                          onChange={(e) =>
+                                            handleEvidenceChange(individual.id, section.id, question.id, e.target.value)
+                                          }
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -166,6 +345,8 @@ export function FitnessChecklist() {
           })}
         </div>
       )}
+
+      <WizardNavigation currentStep="fitness" showErrors />
     </div>
   );
 }

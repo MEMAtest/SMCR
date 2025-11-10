@@ -1,6 +1,5 @@
 "use client";
 
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Share2 } from "lucide-react";
 import { FirmProfileForm } from "@/components/forms/FirmProfileForm";
@@ -13,6 +12,8 @@ import { ReportSummaryPanel } from "@/components/reports/ReportSummaryPanel";
 import { BoardReport } from "@/components/reports/BoardReport";
 import { SaveDraftButton } from "@/components/wizard/SaveDraftButton";
 import { useSmcrStore } from "@/stores/useSmcrStore";
+import { DraftLoader } from "@/components/wizard/DraftLoader";
+import { Suspense } from "react";
 
 // Configurable MEMA tool links via environment variables
 const memaTools = [
@@ -33,6 +34,9 @@ export default function BuilderPage() {
 
   return (
     <main className="px-4 py-20 sm:px-8">
+      <Suspense fallback={null}>
+        <DraftLoader />
+      </Suspense>
       <div className="mx-auto max-w-6xl space-y-10">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-sand/70">
@@ -48,8 +52,8 @@ export default function BuilderPage() {
           {activeStep === "firm" && <FirmProfileForm />}
           {activeStep === "responsibilities" && (
             <>
-              <ResponsibilitiesPreview />
               <SmfRoster />
+              <ResponsibilitiesPreview />
               <ResponsibilityMatrix />
             </>
           )}

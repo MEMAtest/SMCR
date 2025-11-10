@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSmcrStore } from "@/stores/useSmcrStore";
-import { UserPlus, Trash2, Users } from "lucide-react";
+import { UserPlus, Trash2, Users, Info } from "lucide-react";
 import type { Individual } from "@/lib/validation";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
+import { getApplicableSMFs } from "@/lib/smcr-data";
 
 export function SmfRoster() {
   const individuals = useSmcrStore((state) => state.individuals);
+  const firmProfile = useSmcrStore((state) => state.firmProfile);
   const addIndividual = useSmcrStore((state) => state.addIndividual);
   const updateIndividual = useSmcrStore((state) => state.updateIndividual);
   const removeIndividual = useSmcrStore((state) => state.removeIndividual);
+
+  // Get applicable SMF roles based on firm profile
+  const applicableSmfs = useMemo(() => {
+    if (!firmProfile.firmType || !firmProfile.smcrCategory) {
+      return [];
+    }
+    return getApplicableSMFs(firmProfile.firmType, firmProfile.smcrCategory);
+  }, [firmProfile.firmType, firmProfile.smcrCategory]);
 
   const [isAdding, setIsAdding] = useState(false);
   const [newIndividual, setNewIndividual] = useState({
@@ -100,13 +111,34 @@ export function SmfRoster() {
           <div>
             <label className="block text-sm text-sand/80 mb-2">
               SMF Role *
-              <input
-                type="text"
+              <select
                 className="mt-1 w-full rounded-2xl border border-white/20 bg-midnight/60 px-4 py-2 text-sand focus:border-emerald focus:outline-none"
-                placeholder="e.g., SMF1 (CEO), SMF3 (CFO), SMF16 (Compliance)"
                 value={newIndividual.smfRole}
                 onChange={(e) => setNewIndividual({ ...newIndividual, smfRole: e.target.value })}
-              />
+              >
+                <option value="" className="bg-midnight text-sand/50">
+                  Select SMF role...
+                </option>
+                {applicableSmfs.length === 0 ? (
+                  <option value="" disabled className="bg-midnight text-sand/50">
+                    Complete firm profile first
+                  </option>
+                ) : (
+                  applicableSmfs.map((smf) => (
+                    <option key={smf.ref} value={`${smf.ref} - ${smf.label}`} className="bg-midnight text-sand">
+                      {smf.ref} - {smf.label}
+                    </option>
+                  ))
+                )}
+              </select>
+              {applicableSmfs.length > 0 && newIndividual.smfRole && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-white/5 border border-white/10 p-2">
+                  <Info className="size-4 text-emerald flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-sand/70">
+                    {applicableSmfs.find((s) => newIndividual.smfRole.startsWith(s.ref))?.description}
+                  </p>
+                </div>
+              )}
             </label>
           </div>
           <div>
@@ -148,6 +180,8 @@ export function SmfRoster() {
           Add SMF Individual
         </button>
       )}
+
+      <WizardNavigation currentStep="responsibilities" showErrors />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { FIRM_TYPES, SMCR_CATEGORIES } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { Info, MapPin } from "lucide-react";
+import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 
 export function FirmProfileForm() {
   const { firmProfile, updateFirmProfile } = useSmcrStore();
@@ -100,6 +101,8 @@ export function FirmProfileForm() {
           <Info className="size-4 text-sand/50" />
         </label>
       </div>
+
+      <WizardNavigation currentStep="firm" showErrors />
     </div>
   );
 }
