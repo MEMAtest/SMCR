@@ -36,7 +36,7 @@ export function generateResponsibilitiesCSV(
       resp.cat,
       resp.mandatory ? "Yes" : "No",
       owner ? `"${owner.name.replace(/"/g, '""')}"` : "Unassigned",
-      owner ? `"${owner.smfRole.replace(/"/g, '""')}"` : "–",
+      owner ? `"${owner.smfRoles.join(", ").replace(/"/g, '""')}"` : "–",
       owner?.email ? `"${owner.email.replace(/"/g, '""')}"` : "–",
       owner ? "Assigned" : "Pending Assignment",
     ];

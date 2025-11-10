@@ -64,7 +64,7 @@ export async function GET(
       individuals: indivs.map((i) => ({
         id: i.id,
         name: i.fullName,
-        smfRole: i.smfRole,
+        smfRoles: i.smfRoles,
         email: i.email,
       })),
       fitnessResponses: fitness.map((f) => {
@@ -160,7 +160,7 @@ export async function PUT(
           .values({
             firmId,
             fullName: ind.name,
-            smfRole: ind.smfRole,
+            smfRoles: ind.smfRoles,
             email: ind.email || null,
           })
           .returning({ id: individuals.id });

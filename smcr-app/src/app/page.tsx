@@ -60,12 +60,12 @@ export default function Home() {
             </div>
             <div className="mt-12 flex gap-10 text-sm text-sand/80">
               <div>
-                <p className="text-3xl font-semibold text-sand">—</p>
-                <p>responsibilities mapped</p>
+                <p className="text-3xl font-semibold text-sand">45+</p>
+                <p>responsibilities & board-ready exports</p>
               </div>
               <div>
-                <p className="text-3xl font-semibold text-sand">—</p>
-                <p>avg. time to completion</p>
+                <p className="text-3xl font-semibold text-sand">Hours</p>
+                <p>not days - to completion</p>
               </div>
             </div>
           </div>

@@ -263,7 +263,7 @@ export function SmcrReportPDF({
               return (
                 <View key={individual.id} style={styles.tableRow}>
                   <Text style={styles.tableCell}>{individual.name}</Text>
-                  <Text style={styles.tableCell}>{individual.smfRole}</Text>
+                  <Text style={styles.tableCell}>{individual.smfRoles.join(", ")}</Text>
                   <Text style={styles.tableCell}>{ownedCount}</Text>
                 </View>
               );
@@ -287,7 +287,7 @@ export function SmcrReportPDF({
                   <Text style={{ fontSize: 9, color: "#1A1B26" }}>{resp.text}</Text>
                   {owner ? (
                     <Text style={styles.ownerTag}>
-                      Owner: {owner.name} ({owner.smfRole})
+                      Owner: {owner.name} ({owner.smfRoles.join(", ")})
                     </Text>
                   ) : (
                     <Text style={{ fontSize: 8, color: "#D97706", marginTop: 2 }}>
@@ -331,7 +331,7 @@ export function SmcrReportPDF({
                 return (
                   <View key={individual.id} style={styles.tableRow}>
                     <Text style={styles.tableCell}>{individual.name}</Text>
-                    <Text style={styles.tableCell}>{individual.smfRole}</Text>
+                    <Text style={styles.tableCell}>{individual.smfRoles.join(", ")}</Text>
                     <Text style={styles.tableCell}>{individualResponses} recorded</Text>
                   </View>
                 );
@@ -342,9 +342,9 @@ export function SmcrReportPDF({
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>SMCR Compliance Report</Text>
+          <Text>Generated with MEMA SMCR Tool | www.memaconsultants.com</Text>
           <Text>Page 1 of 1</Text>
-          <Text>Generated: {today}</Text>
+          <Text>{today}</Text>
         </View>
       </Page>
     </Document>

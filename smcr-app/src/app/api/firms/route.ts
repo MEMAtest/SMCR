@@ -71,7 +71,7 @@ export async function POST(request: Request) {
           .values({
             firmId,
             fullName: ind.name,
-            smfRole: ind.smfRole,
+            smfRoles: ind.smfRoles,
             email: ind.email || null,
           })
           .returning({ id: individuals.id });

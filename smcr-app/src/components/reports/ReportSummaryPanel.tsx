@@ -96,7 +96,7 @@ export function ReportSummaryPanel() {
         : 0;
 
       return {
-        name: individual.smfRole || individual.name.substring(0, 8),
+        name: individual.name.substring(0, 12),
         complete: completionPercentage,
         outstanding: 100 - completionPercentage,
       };

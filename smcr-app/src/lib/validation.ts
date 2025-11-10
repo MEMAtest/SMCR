@@ -17,7 +17,7 @@ export type FirmProfile = {
 export type Individual = {
   id: string;
   name: string;
-  smfRole: string;
+  smfRoles: string[]; // Array of SMF roles (e.g., ["SMF1", "SMF3", "SMF16"])
   email?: string;
 };
 

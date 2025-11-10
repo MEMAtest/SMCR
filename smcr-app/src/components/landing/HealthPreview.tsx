@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, FileText } from "lucide-react";
+import { ArrowRight, FileText, Users, Shield, CheckSquare } from "lucide-react";
 import { loadDraft, type DraftData } from "@/lib/services/draftService";
 
 export function HealthPreview() {
@@ -114,21 +114,34 @@ export function HealthPreview() {
           </>
         ) : (
           <>
-            <div className="space-y-4 mb-6">
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Coverage score</p>
-                <p className="text-4xl font-semibold text-sand/40">—</p>
-                <p className="text-xs text-sand/70">No active draft</p>
+            <div className="space-y-3 mb-6">
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-4 flex items-start gap-3">
+                <CheckSquare className="size-5 text-emerald flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-sand">Map prescribed responsibilities</p>
+                  <p className="text-xs text-sand/70">Assign 45+ SMCR responsibilities to senior managers</p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Fitness assessment</p>
-                <p className="text-2xl font-semibold text-sand/40">—</p>
-                <p className="text-xs text-sand/70">Start a new SMCR journey</p>
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-4 flex items-start gap-3">
+                <Users className="size-5 text-emerald flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-sand">Assess SMF fitness & propriety</p>
+                  <p className="text-xs text-sand/70">Complete FCA FIT assessments for all SMF individuals</p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Firm profile</p>
-                <p className="text-lg font-semibold text-sand/40">—</p>
-                <p className="text-xs text-sand/70">Launch builder to begin</p>
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-4 flex items-start gap-3">
+                <FileText className="size-5 text-emerald flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-sand">Generate board reports & exports</p>
+                  <p className="text-xs text-sand/70">Export PDF reports and CSV data for regulatory filing</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-4 flex items-start gap-3">
+                <Shield className="size-5 text-emerald flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-sand">Track compliance status</p>
+                  <p className="text-xs text-sand/70">Monitor progress with real-time coverage metrics</p>
+                </div>
               </div>
             </div>
             <Link

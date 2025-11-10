@@ -206,7 +206,13 @@ export function BoardReport() {
                 >
                   <div>
                     <p className="text-base font-semibold text-sand">{individual.name}</p>
-                    <p className="text-sm text-sand/70">{individual.smfRole}</p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {individual.smfRoles.map((role, idx) => (
+                        <span key={idx} className="text-xs text-sand/70 bg-white/5 px-2 py-0.5 rounded">
+                          {role}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-emerald">{ownedCount} responsibilities</p>
@@ -258,7 +264,7 @@ export function BoardReport() {
                     <div className="flex-1">
                       <p className="text-sand/80">{resp.text}</p>
                       {owner && (
-                        <p className="text-xs text-emerald mt-1">Owner: {owner.name} ({owner.smfRole})</p>
+                        <p className="text-xs text-emerald mt-1">Owner: {owner.name} ({owner.smfRoles.join(", ")})</p>
                       )}
                     </div>
                   </div>

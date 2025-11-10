@@ -168,7 +168,13 @@ export function FitnessChecklist() {
                     <User className="size-5 text-emerald" />
                     <div className="text-left">
                       <p className="text-base font-semibold text-sand">{individual.name}</p>
-                      <p className="text-sm text-sand/70">{individual.smfRole}</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {individual.smfRoles.map((role, idx) => (
+                          <span key={idx} className="text-xs text-sand/70">
+                            {role}{idx < individual.smfRoles.length - 1 ? ',' : ''}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

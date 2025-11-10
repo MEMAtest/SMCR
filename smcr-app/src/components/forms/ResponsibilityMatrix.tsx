@@ -125,7 +125,7 @@ export function ResponsibilityMatrix() {
                             : "border border-white/20 text-sand hover:bg-white/5"
                         }`}
                       >
-                        {individual.smfRole}
+                        {individual.name}
                       </button>
                     );
                   })}

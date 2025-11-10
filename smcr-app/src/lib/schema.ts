@@ -25,7 +25,7 @@ export const individuals = pgTable("individuals", {
     .notNull()
     .references(() => firms.id, { onDelete: "cascade" }),
   fullName: text("full_name").notNull(),
-  smfRole: text("smf_role").notNull(),
+  smfRoles: jsonb("smf_roles").$type<string[]>().notNull(),
   email: text("email"),
   location: text("location"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
