@@ -93,7 +93,8 @@ export function validateResponsibilities(
     const unassignedCount = assignedCount - ownedCount;
 
     if (unassignedCount > 0) {
-      errors.push(`${unassignedCount} responsibility/responsibilities need an assigned owner`);
+      const plural = unassignedCount === 1 ? 'responsibility needs' : 'responsibilities need';
+      errors.push(`${unassignedCount} ${plural} an assigned owner`);
     }
   } else if (assignedCount > 0 && individuals.length === 0) {
     warnings.push("Add SMF individuals to assign responsibility ownership");

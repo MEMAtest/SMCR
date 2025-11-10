@@ -61,47 +61,86 @@ export async function POST(request: Request) {
 
     const firmId = record.id;
 
-    // Insert individuals (SMFs)
+    // Insert individuals (SMFs) and capture UUID mapping
+    const newIndividualIds: Record<string, string> = {}; // Map payload ID to DB UUID
+
     if (indivs && indivs.length > 0) {
-      const individualRows = indivs.map((ind) => ({
-        firmId,
-        fullName: ind.name,
-        smfRole: ind.smfRole,
-        email: ind.email || null,
-      }));
-      await db.insert(individuals).values(individualRows);
+      for (const ind of indivs) {
+        const [inserted] = await db
+          .insert(individuals)
+          .values({
+            firmId,
+            fullName: ind.name,
+            smfRole: ind.smfRole,
+            email: ind.email || null,
+          })
+          .returning({ id: individuals.id });
+
+        if (inserted) {
+          newIndividualIds[ind.id] = inserted.id; // Map old ID to new UUID
+        }
+      }
     }
 
-    // Insert responsibilities with ownership
+    // Insert responsibilities with ownership (using mapped UUIDs)
     if (responsibilityRefs?.length) {
       const rows = responsibilityRefs
         .filter((ref) => responsibilityMap.has(ref))
-        .map((ref) => ({
-          firmId,
-          reference: ref,
-          title: responsibilityMap.get(ref) ?? ref,
-          status: "assigned",
-          ownerId: responsibilityOwners?.[ref] || null,
-        }));
+        .map((ref) => {
+          const tempOwnerId = responsibilityOwners?.[ref];
+          const actualOwnerId = tempOwnerId ? newIndividualIds[tempOwnerId] : null;
+          return {
+            firmId,
+            reference: ref,
+            title: responsibilityMap.get(ref) ?? ref,
+            status: "assigned",
+            ownerId: actualOwnerId || null,
+          };
+        });
 
       if (rows.length) {
         await db.insert(responsibilities).values(rows);
       }
     }
 
-    // Insert fitness assessments
-    if (fitnessResponses && fitnessResponses.length > 0) {
-      const fitnessRows = fitnessResponses.map((resp) => {
-        // New format: questionId is "individualId::sectionId::questionIndex"
-        const [individualId, sectionId] = resp.questionId.split("::");
-        return {
-          individualId,
-          fitSection: resp.questionId, // Store full questionId for later retrieval
-          response: resp.response,
-          evidenceLinks: resp.evidence ? [resp.evidence] : [],
-        };
-      });
-      await db.insert(fitnessAssessments).values(fitnessRows);
+    // Insert fitness assessments with corrected individual IDs
+    if (fitnessResponses && fitnessResponses.length > 0 && Object.keys(newIndividualIds).length > 0) {
+      const fitnessRows = fitnessResponses
+        .map((resp) => {
+          // New format: questionId is "individualId::sectionId::questionIndex"
+          const [oldIndividualId, sectionId, questionIndex] = resp.questionId.split("::");
+          const newIndividualId = newIndividualIds[oldIndividualId];
+
+          if (!newIndividualId) {
+            console.warn(`No mapping found for individual ID: ${oldIndividualId}`);
+            return null;
+          }
+
+          // Reconstruct questionId with new UUID
+          const newQuestionId = `${newIndividualId}::${sectionId}::${questionIndex}`;
+
+          return {
+            individualId: newIndividualId,
+            fitSection: newQuestionId, // Store full questionId
+            response: resp.response,
+            evidenceLinks: resp.evidence ? [resp.evidence] : [],
+          };
+        })
+        .filter((row: {
+          individualId: string;
+          fitSection: string;
+          response: string;
+          evidenceLinks: string[];
+        } | null): row is {
+          individualId: string;
+          fitSection: string;
+          response: string;
+          evidenceLinks: string[];
+        } => row !== null);
+
+      if (fitnessRows.length > 0) {
+        await db.insert(fitnessAssessments).values(fitnessRows);
+      }
     }
 
     return NextResponse.json({ id: firmId }, { status: 201 });

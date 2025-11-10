@@ -60,7 +60,10 @@ export async function saveDraft(
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      const errorData = await response.json().catch((e) => {
+        console.warn('Failed to parse error response:', e);
+        return { error: "Unknown error" };
+      });
       return {
         success: false,
         error: errorData.error || `HTTP ${response.status}: Failed to save draft`,
@@ -95,7 +98,10 @@ export async function loadDraft(draftId: string): Promise<LoadDraftResult> {
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      const errorData = await response.json().catch((e) => {
+        console.warn('Failed to parse error response:', e);
+        return { error: "Unknown error" };
+      });
       return {
         success: false,
         error: errorData.error || `HTTP ${response.status}: Failed to load draft`,
