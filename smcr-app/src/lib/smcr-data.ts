@@ -144,7 +144,7 @@ export type JourneyStep = {
   id: JourneyStepKey;
   title: string;
   description: string;
-  status: "pending" | "active" | "done";
+  status: "pending" | "active" | "done" | "partial";
 };
 
 export const DEFAULT_STEPS: JourneyStep[] = [

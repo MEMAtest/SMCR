@@ -3,20 +3,24 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Share2 } from "lucide-react";
 import { FirmProfileForm } from "@/components/forms/FirmProfileForm";
 import { ResponsibilitiesPreview } from "@/components/forms/ResponsibilitiesPreview";
+import { SmfRoster } from "@/components/forms/SmfRoster";
+import { ResponsibilityMatrix } from "@/components/forms/ResponsibilityMatrix";
 import { FitnessChecklist } from "@/components/forms/FitnessChecklist";
 import { WizardShell } from "@/components/wizard/WizardShell";
 import { ReportSummaryPanel } from "@/components/reports/ReportSummaryPanel";
+import { BoardReport } from "@/components/reports/BoardReport";
 import { SaveDraftButton } from "@/components/wizard/SaveDraftButton";
 
+// Configurable MEMA tool links via environment variables
 const memaTools = [
   {
     name: "Vulnerability heatmap",
-    href: "https://vulnerability.memaconsultants.com",
+    href: process.env.NEXT_PUBLIC_MEMA_VULNERABILITY_URL || "https://vulnerability.memaconsultants.com",
     description: "Push flagged SMFs for deeper conduct analytics.",
   },
   {
     name: "FCA fines tracker",
-    href: "https://fcafines.memaconsultants.com",
+    href: process.env.NEXT_PUBLIC_MEMA_FINES_URL || "https://fcafines.memaconsultants.com",
     description: "Benchmark exposure against current enforcement actions.",
   },
 ];
@@ -34,14 +38,17 @@ export default function BuilderPage() {
             <ArrowLeft className="size-4" /> Back to overview
           </Link>
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm text-sand/80">
-            <Share2 className="size-4" /> Autosave enabled · Neon sync pending
+            <Share2 className="size-4" /> Auto-save to secure draft storage
           </div>
         </div>
 
         <WizardShell rightPanel={<ReportSummaryPanel />}>
           <FirmProfileForm />
           <ResponsibilitiesPreview />
+          <SmfRoster />
+          <ResponsibilityMatrix />
           <FitnessChecklist />
+          <BoardReport />
 
           <section className="glass-panel p-6 space-y-4">
             <div className="flex items-center justify-between">
