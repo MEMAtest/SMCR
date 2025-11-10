@@ -530,29 +530,251 @@ export function getSuggestedPRsForSMF(smfRef: string): string[] {
   return SMF_PR_MAPPING[smfRef] || [];
 }
 
-export const FIT_SECTIONS = [
+export interface FitQuestion {
+  id: string;
+  question: string;
+  type: "yesno" | "text" | "date";
+  requiresDetails?: boolean; // If yes, show follow-up text field
+  requiresDate?: boolean; // If yes, show date field
+  helpText?: string;
+}
+
+export interface FitSection {
+  id: string;
+  title: string;
+  description: string;
+  questions: FitQuestion[];
+}
+
+export const FIT_SECTIONS: FitSection[] = [
   {
     id: "honesty",
     title: "Honesty, Integrity & Reputation (FIT 2.1)",
+    description: "Assessment of integrity, ethical conduct, and reputation in financial services",
     questions: [
-      "Any criminal convictions (spent or unspent) relating to dishonesty or financial crime?",
-      "Investigations or disciplinary actions by regulators or professional bodies?",
+      {
+        id: "criminal_convictions",
+        question: "Any criminal convictions (spent or unspent) relating to dishonesty, fraud, or financial crime?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+        helpText: "Include all convictions regardless of jurisdiction",
+      },
+      {
+        id: "regulatory_investigations",
+        question: "Subject to any regulatory investigations or disciplinary actions by the FCA, PRA, or other regulatory bodies?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+        helpText: "Include ongoing and completed investigations",
+      },
+      {
+        id: "fiduciary_breach",
+        question: "Any breach of fiduciary duty or trust in a professional capacity?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Consider duties owed to clients, employers, or beneficiaries",
+      },
+      {
+        id: "director_disqualification",
+        question: "Disqualified from acting as a director or been involved in company insolvency proceedings?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+        helpText: "Include director disqualification orders and voluntary disqualifications",
+      },
+      {
+        id: "market_abuse",
+        question: "Engaged in or investigated for market abuse, insider dealing, or market manipulation?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+      },
+      {
+        id: "money_laundering",
+        question: "Any involvement in money laundering or terrorist financing offenses?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+        helpText: "Include suspicions, investigations, or proven offenses",
+      },
+      {
+        id: "fraud_misrepresentation",
+        question: "Allegations or findings of fraud, misrepresentation, or dishonest conduct?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Include civil and criminal proceedings",
+      },
+      {
+        id: "civil_proceedings",
+        question: "Civil proceedings with adverse findings related to financial services activity?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Include judgments, settlements, or ongoing cases",
+      },
+      {
+        id: "overseas_sanctions",
+        question: "Disciplinary actions or sanctions from overseas regulators or financial services bodies?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+      },
+      {
+        id: "professional_sanctions",
+        question: "Sanctions or reprimands from professional bodies (e.g., accountancy, legal, actuarial)?",
+        type: "yesno",
+        requiresDetails: true,
+      },
+      {
+        id: "adverse_media",
+        question: "Adverse media reports or public information raising integrity concerns?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Consider reputation risk and public perception",
+      },
+      {
+        id: "previous_refusal",
+        question: "Previously refused, restricted, or withdrawn from FCA/PRA approved person status?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+      },
     ],
   },
   {
     id: "competence",
     title: "Competence & Capability (FIT 2.2)",
+    description: "Assessment of skills, knowledge, and ability to perform the SMF role effectively",
     questions: [
-      "Demonstrable experience and training relevant to the SMF role?",
-      "Sufficient time and resources to discharge the responsibilities?",
+      {
+        id: "relevant_qualifications",
+        question: "Hold relevant qualifications for the senior management function?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "List professional qualifications, certifications, and degrees",
+      },
+      {
+        id: "relevant_experience",
+        question: "Demonstrable experience in financial services relevant to the SMF role?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Describe previous roles, duration, and key responsibilities",
+      },
+      {
+        id: "cpd_commitment",
+        question: "Commitment to continuous professional development (CPD)?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Describe CPD activities, training plans, and professional memberships",
+      },
+      {
+        id: "track_record",
+        question: "Positive track record in previous senior management or equivalent roles?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Include references, performance reviews, or testimonials",
+      },
+      {
+        id: "references",
+        question: "Can provide satisfactory references from previous employers or regulators?",
+        type: "yesno",
+        requiresDetails: true,
+      },
+      {
+        id: "technical_knowledge",
+        question: "Sufficient technical knowledge of relevant regulations, products, and markets?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Consider SMCR, conduct rules, and sector-specific regulations",
+      },
+      {
+        id: "time_commitment",
+        question: "Sufficient time available to discharge the responsibilities effectively?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Consider other directorships, commitments, and time allocation",
+      },
+      {
+        id: "regulatory_knowledge",
+        question: "Understanding of FCA/PRA regulatory framework and conduct standards?",
+        type: "yesno",
+        requiresDetails: true,
+      },
+      {
+        id: "conflicts_disclosure",
+        question: "Any conflicts of interest that could impair independence or judgment?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Include financial interests, relationships, or external commitments",
+      },
+      {
+        id: "language_proficiency",
+        question: "Sufficient language proficiency to perform the role effectively?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Consider communication requirements with regulators and stakeholders",
+      },
     ],
   },
   {
     id: "financial",
     title: "Financial Soundness (FIT 2.3)",
+    description: "Assessment of financial soundness and independence from financial pressures",
     questions: [
-      "Outstanding judgments, bankruptcies, or arrangements with creditors?",
-      "Any adverse financial events that could impact independence?",
+      {
+        id: "ccj_orders",
+        question: "Any County Court Judgments (CCJs) or unsatisfied court orders?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+        helpText: "Include satisfied and unsatisfied judgments",
+      },
+      {
+        id: "bankruptcy",
+        question: "Ever been declared bankrupt or entered into bankruptcy proceedings?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+      },
+      {
+        id: "iva_dro",
+        question: "Individual Voluntary Arrangement (IVA) or Debt Relief Order (DRO) in place or previously?",
+        type: "yesno",
+        requiresDetails: true,
+        requiresDate: true,
+      },
+      {
+        id: "creditor_arrangements",
+        question: "Any arrangements with creditors, debt management plans, or outstanding debts?",
+        type: "yesno",
+        requiresDetails: true,
+      },
+      {
+        id: "litigation_exposure",
+        question: "Currently involved in any litigation with material financial exposure?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Consider potential impact on independence",
+      },
+      {
+        id: "tax_compliance",
+        question: "Fully compliant with all tax obligations in all relevant jurisdictions?",
+        type: "yesno",
+        requiresDetails: true,
+        helpText: "Include HMRC investigations or settlements",
+      },
+      {
+        id: "financial_stability",
+        question: "Current financial position stable and free from pressures that could impair judgment?",
+        type: "yesno",
+        requiresDetails: true,
+      },
+      {
+        id: "guarantees_liabilities",
+        question: "Any personal guarantees or contingent liabilities that could create financial pressure?",
+        type: "yesno",
+        requiresDetails: true,
+      },
     ],
   },
 ];

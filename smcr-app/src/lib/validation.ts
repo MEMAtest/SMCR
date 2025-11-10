@@ -24,8 +24,10 @@ export type Individual = {
 export type FitnessResponse = {
   sectionId: string;
   questionId: string;
-  response: string;
-  evidence?: string;
+  response: "yes" | "no" | "n/a" | string; // Yes/No/N/A or legacy text
+  details?: string; // Conditional follow-up text
+  date?: string; // Conditional date field
+  evidence?: string; // Evidence links/attachments
 };
 
 export type ValidationResult = {
@@ -82,8 +84,13 @@ export function validateResponsibilities(
     errors.push("At least one prescribed responsibility must be selected");
   }
 
+  // Require individuals before proceeding
+  if (individuals.length === 0) {
+    errors.push("Add at least one SMF individual to assign responsibilities");
+  }
+
   // Check if responsibilities are assigned to individuals
-  if (responsibilityOwners) {
+  if (responsibilityOwners && individuals.length > 0) {
     // Count only owners for currently assigned responsibilities
     const assignedRefs = Object.entries(assignments)
       .filter(([, value]) => value)
@@ -95,8 +102,6 @@ export function validateResponsibilities(
     if (unassignedCount > 0) {
       errors.push(`${unassignedCount} responsibility/responsibilities need an assigned owner`);
     }
-  } else if (assignedCount > 0 && individuals.length === 0) {
-    warnings.push("Add SMF individuals to assign responsibility ownership");
   }
 
   const isValid = errors.length === 0 && assignedCount > 0;
