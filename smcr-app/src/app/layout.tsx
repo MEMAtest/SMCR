@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/auth/SessionProvider";
+import { Analytics } from "@vercel/analytics/react";
 
 const display = Playfair_Display({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({
         className={`${display.variable} ${inter.variable} ${plexMono.variable} bg-midnight text-sand min-h-screen`}
       >
         <SessionProvider>{children}</SessionProvider>
+        <Analytics />
       </body>
     </html>
   );
