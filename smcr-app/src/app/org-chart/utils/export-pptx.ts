@@ -64,6 +64,18 @@ function layoutTree(root: OrgNode): LayoutNode[] {
 
   measure(root);
   place(root, nextX, 0);
+
+  // Scale down if tree exceeds slide width (13.33 inches for LAYOUT_WIDE)
+  const SLIDE_W = 13.33;
+  const maxRight = nodes.reduce((max, n) => Math.max(max, n.x + n.width), 0);
+  if (maxRight > SLIDE_W - 0.5) {
+    const scale = (SLIDE_W - 1) / maxRight;
+    for (const n of nodes) {
+      n.x = 0.5 + (n.x - 0.5) * scale;
+      n.width *= scale;
+    }
+  }
+
   return nodes;
 }
 

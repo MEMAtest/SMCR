@@ -116,8 +116,8 @@ function persistGroupEntities(entities: GroupEntity[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem("smcr-group-entities", JSON.stringify(entities));
-  } catch {
-    // localStorage full or unavailable
+  } catch (e) {
+    console.error("Failed to persist group entities:", e);
   }
 }
 
@@ -288,16 +288,23 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
 
   updateGroupEntity: (id, updates) => {
     set((state) => {
-      // Prevent circular parent references
-      if (updates.parentId !== undefined && updates.parentId !== "") {
-        const wouldCycle = (targetId: string): boolean => {
-          if (targetId === id) return true;
-          const parent = state.groupEntities.find((e) => e.id === targetId);
-          if (!parent || !parent.parentId) return false;
-          return wouldCycle(parent.parentId);
-        };
-        if (wouldCycle(updates.parentId)) {
-          return { groupEntities: state.groupEntities };
+      // Prevent circular parent references; normalize empty string to undefined
+      if (updates.parentId !== undefined) {
+        if (updates.parentId === "") {
+          updates = { ...updates, parentId: undefined };
+        } else {
+          if (updates.parentId === id) {
+            return { groupEntities: state.groupEntities };
+          }
+          const wouldCycle = (targetId: string): boolean => {
+            if (targetId === id) return true;
+            const parent = state.groupEntities.find((e) => e.id === targetId);
+            if (!parent || !parent.parentId) return false;
+            return wouldCycle(parent.parentId);
+          };
+          if (wouldCycle(updates.parentId)) {
+            return { groupEntities: state.groupEntities };
+          }
         }
       }
       const next = state.groupEntities.map((e) =>

@@ -107,8 +107,6 @@ function buildManagerHierarchy(
   members: OrgPerson[],
   allPeople: OrgPerson[]
 ): OrgNode[] {
-  // For now, arrange: first person in dept = implicit lead, rest are peers
-  // A more sophisticated approach would use managerId
   const managerMap = new Map<string | undefined, OrgPerson[]>();
   for (const m of members) {
     const mgrId = m.managerId;
@@ -116,9 +114,24 @@ function buildManagerHierarchy(
     managerMap.get(mgrId)!.push(m);
   }
 
-  // Build tree from people without managers first
-  const topLevel = managerMap.get(undefined) || members;
-  function buildPersonNode(person: OrgPerson, depth: number): OrgNode {
+  // People without managers are roots; if none exist, show all as flat list
+  const topLevel = managerMap.get(undefined) ?? [];
+  const roots = topLevel.length > 0 ? topLevel : members;
+
+  function buildPersonNode(person: OrgPerson, depth: number, visited: Set<string>): OrgNode {
+    // Guard against circular managerId references
+    if (visited.has(person.id)) {
+      return {
+        id: person.id,
+        label: person.name,
+        type: "person",
+        depth,
+        children: [],
+      };
+    }
+    const nextVisited = new Set(visited);
+    nextVisited.add(person.id);
+
     const reports = managerMap.get(person.id) || [];
     const managerPerson = person.managerId
       ? allPeople.find((p) => p.id === person.managerId)
@@ -137,7 +150,7 @@ function buildManagerHierarchy(
         .join(", "),
       roleCategory: person.roleCategory,
       depth,
-      children: reports.map((r) => buildPersonNode(r, depth + 1)),
+      children: reports.map((r) => buildPersonNode(r, depth + 1, nextVisited)),
       crossDepartment: crossDept,
       managerId: person.managerId,
       managerName: managerPerson?.name,
@@ -145,7 +158,7 @@ function buildManagerHierarchy(
     };
   }
 
-  return topLevel.map((p) => buildPersonNode(p, 2));
+  return roots.map((p) => buildPersonNode(p, 2, new Set()));
 }
 
 function buildGroupTree(entities: GroupEntity[]): OrgNode {
@@ -158,9 +171,22 @@ function buildGroupTree(entities: GroupEntity[]): OrgNode {
     }
   }
 
-  function toNode(entity: GroupEntity, depth: number): OrgNode {
+  function toNode(entity: GroupEntity, depth: number, visited: Set<string>): OrgNode {
+    // Guard against circular parentId references or extreme depth
+    if (visited.has(entity.id) || depth > 50) {
+      return {
+        id: entity.id,
+        label: entity.name,
+        type: entity.type === "parent" ? "company" : "subsidiary",
+        depth,
+        children: [],
+      };
+    }
+    const nextVisited = new Set(visited);
+    nextVisited.add(entity.id);
+
     const children = (childMap.get(entity.id) || []).map((c) =>
-      toNode(c, depth + 1)
+      toNode(c, depth + 1, nextVisited)
     );
     return {
       id: entity.id,
@@ -186,7 +212,7 @@ function buildGroupTree(entities: GroupEntity[]): OrgNode {
   }
 
   if (roots.length === 1) {
-    return toNode(roots[0], 0);
+    return toNode(roots[0], 0, new Set());
   }
 
   // Multiple roots — wrap in a virtual holding node
@@ -195,7 +221,7 @@ function buildGroupTree(entities: GroupEntity[]): OrgNode {
     label: "Corporate Group",
     type: "company",
     depth: 0,
-    children: roots.map((r) => toNode(r, 1)),
+    children: roots.map((r) => toNode(r, 1, new Set())),
   };
 }
 
@@ -218,8 +244,12 @@ function CompanyCard({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Company: ${node.label}`}
       onClick={onClick}
-      className={`rounded-2xl border-2 px-4 py-3 cursor-pointer transition-all min-w-[180px] max-w-[220px] ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className={`rounded-2xl border-2 px-4 py-3 cursor-pointer transition-all min-w-[180px] max-w-[220px] focus:outline-none focus:ring-2 focus:ring-emerald ${
         highlighted
           ? "border-emerald bg-emerald/20 shadow-lg"
           : "border-blue-600 bg-blue-900/60 hover:bg-blue-900/80"
@@ -249,8 +279,12 @@ function DepartmentCard({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Department: ${node.label}`}
       onClick={onClick}
-      className={`rounded-xl border px-3 py-2 cursor-pointer transition-all min-w-[160px] max-w-[200px] ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className={`rounded-xl border px-3 py-2 cursor-pointer transition-all min-w-[160px] max-w-[200px] focus:outline-none focus:ring-2 focus:ring-emerald ${
         highlighted
           ? "border-emerald bg-emerald/20 shadow-lg"
           : "border-slate-500 bg-slate-700/60 hover:bg-slate-700/80"
@@ -284,8 +318,12 @@ function PersonCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Person: ${node.label}${node.roleBadge ? `, roles: ${node.roleBadge}` : ""}`}
       onClick={onClick}
-      className={`rounded-xl border-2 px-3 py-2 cursor-pointer transition-all min-w-[160px] max-w-[200px] ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className={`rounded-xl border-2 px-3 py-2 cursor-pointer transition-all min-w-[160px] max-w-[200px] focus:outline-none focus:ring-2 focus:ring-emerald ${
         highlighted
           ? `${borderClass} bg-emerald/20 shadow-lg ring-2 ring-emerald`
           : `${borderClass} bg-white/5 hover:bg-white/10`
@@ -333,8 +371,12 @@ function SubsidiaryCard({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Subsidiary: ${node.label}`}
       onClick={onClick}
-      className={`rounded-2xl border-2 px-4 py-3 cursor-pointer transition-all min-w-[180px] max-w-[220px] ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+      className={`rounded-2xl border-2 px-4 py-3 cursor-pointer transition-all min-w-[180px] max-w-[220px] focus:outline-none focus:ring-2 focus:ring-emerald ${
         highlighted
           ? "border-emerald bg-emerald/20 shadow-lg"
           : "border-blue-400 bg-blue-800/40 hover:bg-blue-800/60"
@@ -505,7 +547,13 @@ function AddEntityDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add Group Entity"
+    >
       <div className="glass-panel p-6 w-full max-w-md space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-sand">Add Group Entity</h3>
@@ -520,6 +568,7 @@ function AddEntityDialog({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            maxLength={100}
             className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand focus:border-emerald focus:outline-none"
             placeholder="e.g. Fanta Ltd"
             autoFocus
@@ -576,6 +625,7 @@ function AddEntityDialog({
             type="text"
             value={country}
             onChange={(e) => setCountry(e.target.value)}
+            maxLength={100}
             className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand focus:border-emerald focus:outline-none"
             placeholder="e.g. United Kingdom"
           />
@@ -587,6 +637,7 @@ function AddEntityDialog({
             type="text"
             value={regulatoryStatus}
             onChange={(e) => setRegulatoryStatus(e.target.value)}
+            maxLength={100}
             className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand focus:border-emerald focus:outline-none"
             placeholder="e.g. FCA Authorised"
           />
@@ -598,6 +649,7 @@ function AddEntityDialog({
             type="text"
             value={linkedProjectName}
             onChange={(e) => setLinkedProjectName(e.target.value)}
+            maxLength={200}
             className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand focus:border-emerald focus:outline-none"
             placeholder="Project name"
           />
@@ -810,6 +862,7 @@ export default function OrgChartClient() {
   );
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Build trees
@@ -847,18 +900,21 @@ export default function OrgChartClient() {
       }
       findChain(activeTree, nodeId, []);
 
-      // Toggle: if already highlighted, clear
-      if (highlightedChain.has(nodeId) && highlightedChain.size > 0) {
-        setHighlightedChain(new Set());
-      } else {
-        setHighlightedChain(chain);
-      }
+      // Toggle: if already highlighted, clear (functional update avoids stale closure)
+      setHighlightedChain((prev) => {
+        if (prev.has(nodeId) && prev.size > 0) {
+          return new Set();
+        }
+        return chain;
+      });
     },
-    [activeTree, highlightedChain, viewMode]
+    [activeTree, viewMode]
   );
 
   // Export handlers
   const handleExportPPTX = useCallback(async () => {
+    if (isExporting) return;
+    setIsExporting(true);
     try {
       const { exportOrgChartPPTX } = await import("./utils/export-pptx");
       await exportOrgChartPPTX(
@@ -869,12 +925,19 @@ export default function OrgChartClient() {
     } catch (err) {
       console.error("Failed to export PPTX:", err);
       alert("Failed to export PPTX. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
-  }, [activeTree, firmProfile.firmName, viewMode]);
+  }, [activeTree, firmProfile.firmName, viewMode, isExporting]);
 
   const handleExportPNG = useCallback(async () => {
+    if (isExporting) return;
+    if (!chartRef.current) {
+      alert("Chart not ready for export. Please try again.");
+      return;
+    }
+    setIsExporting(true);
     try {
-      if (!chartRef.current) return;
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(chartRef.current, {
         backgroundColor: "#032029",
@@ -883,12 +946,16 @@ export default function OrgChartClient() {
       const link = document.createElement("a");
       link.download = `${(firmProfile.firmName || "OrgChart").replace(/[^a-zA-Z0-9]/g, "_")}_OrgChart.png`;
       link.href = canvas.toDataURL("image/png");
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error("Failed to export PNG:", err);
       alert("Failed to export PNG. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
-  }, [firmProfile.firmName]);
+  }, [firmProfile.firmName, isExporting]);
 
   // Selected entity for detail panel
   const selectedEntity = selectedEntityId
