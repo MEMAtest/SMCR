@@ -14,6 +14,19 @@ import {
   getStepStatus,
 } from "@/lib/validation";
 
+export interface GroupEntity {
+  id: string;
+  name: string;
+  type: "parent" | "subsidiary" | "associate";
+  linkedFirmId?: string;
+  linkedProjectId?: string;
+  linkedProjectName?: string;
+  parentId?: string;
+  ownershipPercent?: number;
+  country?: string;
+  regulatoryStatus?: string;
+}
+
 type SmcrState = {
   // Core data
   steps: typeof DEFAULT_STEPS;
@@ -24,6 +37,7 @@ type SmcrState = {
   individuals: Individual[];
   fitnessResponses: FitnessResponse[];
   draftId?: string; // ID of the saved draft
+  groupEntities: GroupEntity[];
 
   // Actions - navigation
   setActiveStep: (step: JourneyStepKey) => void;
@@ -50,6 +64,12 @@ type SmcrState = {
   removeFitnessResponse: (sectionId: string, questionId: string) => void;
   setFitnessResponses: (responses: FitnessResponse[]) => void;
 
+  // Actions - group entities
+  addGroupEntity: (entity: Omit<GroupEntity, "id">) => void;
+  updateGroupEntity: (id: string, updates: Partial<GroupEntity>) => void;
+  removeGroupEntity: (id: string) => void;
+  linkEntityToFirm: (entityId: string, firmId: string) => void;
+
   // Actions - validation
   validateStep: (stepId: JourneyStepKey) => ReturnType<typeof getStepValidation>;
   updateStepStatuses: () => void;
@@ -58,6 +78,48 @@ type SmcrState = {
   setDraftId: (id: string) => void;
   loadDraft: (data: Partial<SmcrState>) => void;
 };
+
+const VALID_ENTITY_TYPES = new Set(["parent", "subsidiary", "associate"]);
+
+function isValidGroupEntity(value: unknown): value is GroupEntity {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.name === "string" &&
+    typeof obj.type === "string" &&
+    VALID_ENTITY_TYPES.has(obj.type) &&
+    (obj.parentId === undefined || typeof obj.parentId === "string") &&
+    (obj.ownershipPercent === undefined || typeof obj.ownershipPercent === "number") &&
+    (obj.linkedFirmId === undefined || typeof obj.linkedFirmId === "string") &&
+    (obj.linkedProjectId === undefined || typeof obj.linkedProjectId === "string") &&
+    (obj.linkedProjectName === undefined || typeof obj.linkedProjectName === "string") &&
+    (obj.country === undefined || typeof obj.country === "string") &&
+    (obj.regulatoryStatus === undefined || typeof obj.regulatoryStatus === "string")
+  );
+}
+
+function loadGroupEntities(): GroupEntity[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("smcr-group-entities");
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isValidGroupEntity);
+  } catch {
+    return [];
+  }
+}
+
+function persistGroupEntities(entities: GroupEntity[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("smcr-group-entities", JSON.stringify(entities));
+  } catch {
+    // localStorage full or unavailable
+  }
+}
 
 const defaultAssignments = PRESCRIBED_RESPONSIBILITIES.reduce<Record<string, boolean>>((acc, item) => {
   acc[item.ref] = false; // All unchecked by default
@@ -76,6 +138,7 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
   individuals: [],
   fitnessResponses: [],
   draftId: undefined,
+  groupEntities: loadGroupEntities(),
 
   // Navigation actions
   setActiveStep: (step) => {
@@ -207,6 +270,67 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
   setFitnessResponses: (responses) => {
     set({ fitnessResponses: responses });
     get().updateStepStatuses();
+  },
+
+  // Group entity actions
+  addGroupEntity: (input) => {
+    const entity: GroupEntity = { ...input, id: `ge-${Date.now()}-${Math.random().toString(36).slice(2, 9)}` };
+    set((state) => {
+      // Validate parentId exists if provided
+      if (entity.parentId && !state.groupEntities.some((e) => e.id === entity.parentId)) {
+        return { groupEntities: state.groupEntities };
+      }
+      const next = [...state.groupEntities, entity];
+      persistGroupEntities(next);
+      return { groupEntities: next };
+    });
+  },
+
+  updateGroupEntity: (id, updates) => {
+    set((state) => {
+      // Prevent circular parent references
+      if (updates.parentId !== undefined && updates.parentId !== "") {
+        const wouldCycle = (targetId: string): boolean => {
+          if (targetId === id) return true;
+          const parent = state.groupEntities.find((e) => e.id === targetId);
+          if (!parent || !parent.parentId) return false;
+          return wouldCycle(parent.parentId);
+        };
+        if (wouldCycle(updates.parentId)) {
+          return { groupEntities: state.groupEntities };
+        }
+      }
+      const next = state.groupEntities.map((e) =>
+        e.id === id ? { ...e, ...updates } : e
+      );
+      persistGroupEntities(next);
+      return { groupEntities: next };
+    });
+  },
+
+  removeGroupEntity: (id) => {
+    set((state) => {
+      const removed = state.groupEntities.find((e) => e.id === id);
+      const reparentedParentId = removed?.parentId ?? undefined;
+      // Reparent children of the deleted entity to its parent (or make them root)
+      const next = state.groupEntities
+        .filter((e) => e.id !== id)
+        .map((e) =>
+          e.parentId === id ? { ...e, parentId: reparentedParentId } : e
+        );
+      persistGroupEntities(next);
+      return { groupEntities: next };
+    });
+  },
+
+  linkEntityToFirm: (entityId, firmId) => {
+    set((state) => {
+      const next = state.groupEntities.map((e) =>
+        e.id === entityId ? { ...e, linkedFirmId: firmId } : e
+      );
+      persistGroupEntities(next);
+      return { groupEntities: next };
+    });
   },
 
   // Validation actions
