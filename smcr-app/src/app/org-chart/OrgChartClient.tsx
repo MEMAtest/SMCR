@@ -901,24 +901,45 @@ function PersonModal({
     setSmfRolesList(smfRolesList.filter((r) => r !== role));
   };
 
+  // People available as managers (exclude self in edit mode)
+  const managerOptions = individuals.filter(
+    (ind) => !(mode === "edit" && person && ind.id === person.id)
+  );
+
+  // Detect circular managerId references (A→B→A)
+  const wouldCreateManagerCycle = (targetManagerId: string): boolean => {
+    if (!person) return false; // Only relevant in edit mode
+    const visited = new Set<string>();
+    let current: string | undefined = targetManagerId;
+    while (current) {
+      if (current === person.id) return true;
+      if (visited.has(current)) return false; // Already a cycle elsewhere
+      visited.add(current);
+      const mgr = individuals.find((ind) => ind.id === current);
+      current = mgr?.managerId;
+    }
+    return false;
+  };
+
   const handleSubmit = () => {
     if (!name.trim()) return;
+    const resolvedManagerId = managerId || undefined;
+    // Check for circular manager chain in edit mode
+    if (resolvedManagerId && mode === "edit" && person && wouldCreateManagerCycle(resolvedManagerId)) {
+      alert("Cannot set this manager — it would create a circular reporting chain.");
+      return;
+    }
     onSave({
       ...(mode === "edit" && person ? { id: person.id } : {}),
       name: name.trim(),
       roleTitle: roleTitle.trim() || undefined,
       department: department.trim() || undefined,
-      managerId: managerId || undefined,
+      managerId: resolvedManagerId,
       smfRoles: smfRolesList,
       email: person?.email,
     });
     onClose();
   };
-
-  // People available as managers (exclude self in edit mode)
-  const managerOptions = individuals.filter(
-    (ind) => !(mode === "edit" && person && ind.id === person.id)
-  );
 
   return (
     <div
@@ -1038,9 +1059,9 @@ function PersonModal({
         {/* Selected SMF Roles */}
         {smfRolesList.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {smfRolesList.map((role, idx) => (
+            {smfRolesList.map((role) => (
               <span
-                key={idx}
+                key={role}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-warning/15 text-warning text-xs font-medium"
               >
                 {role.split(" - ")[0]}
@@ -1118,9 +1139,17 @@ function PeopleListView({
     return entries;
   }, [individuals]);
 
+  const managerNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const ind of individuals) {
+      map.set(ind.id, ind.name);
+    }
+    return map;
+  }, [individuals]);
+
   const getManagerName = (managerId?: string) => {
     if (!managerId) return null;
-    return individuals.find((ind) => ind.id === managerId)?.name || null;
+    return managerNameMap.get(managerId) || null;
   };
 
   const deptColor = (dept: string) => {
@@ -1146,7 +1175,10 @@ function PeopleListView({
           <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${deptColor(dept)}`}>
             <FolderOpen className="size-4" />
             <span className="text-sm font-semibold">{dept}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 font-medium">
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 font-medium"
+              aria-label={`${members.length} ${members.length === 1 ? "person" : "people"}`}
+            >
               {members.length}
             </span>
           </div>
@@ -1178,9 +1210,9 @@ function PeopleListView({
                 </div>
                 {smfBadges.length > 0 && (
                   <div className="flex gap-1 shrink-0">
-                    {smfBadges.map((badge, idx) => (
+                    {smfBadges.map((badge) => (
                       <span
-                        key={idx}
+                        key={badge}
                         className="px-2 py-0.5 rounded-md bg-warning/15 text-warning text-xs font-bold"
                       >
                         {badge}
@@ -1326,14 +1358,20 @@ export default function OrgChartClient() {
     setPersonModalMode("edit");
   };
   const handleSavePerson = (data: Omit<Individual, "id"> & { id?: string }) => {
-    if (personModalMode === "edit" && data.id) {
+    if (data.id) {
       const { id, ...updates } = data;
       updateIndividual(id, updates);
     } else {
-      addIndividual({
-        ...data,
+      const newIndividual: Individual = {
         id: `ind-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      } as Individual);
+        name: data.name,
+        smfRoles: data.smfRoles,
+        email: data.email,
+        roleTitle: data.roleTitle,
+        department: data.department,
+        managerId: data.managerId,
+      };
+      addIndividual(newIndividual);
     }
   };
   const handleDeletePerson = () => {

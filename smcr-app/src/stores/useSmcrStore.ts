@@ -221,7 +221,10 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
 
   removeIndividual: (id) => {
     set((state) => ({
-      individuals: state.individuals.filter((ind) => ind.id !== id),
+      individuals: state.individuals
+        .filter((ind) => ind.id !== id)
+        // Clear managerId references pointing to the deleted individual
+        .map((ind) => ind.managerId === id ? { ...ind, managerId: undefined } : ind),
       // Clean up related data
       responsibilityOwners: Object.fromEntries(
         Object.entries(state.responsibilityOwners).filter(([, ownerId]) => ownerId !== id)
