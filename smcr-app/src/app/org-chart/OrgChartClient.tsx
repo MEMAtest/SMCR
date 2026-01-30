@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Building2,
   Building,
@@ -20,9 +20,11 @@ import {
   GitBranch,
   List,
   FolderOpen,
+  Loader2,
 } from "lucide-react";
 import { useSmcrStore, type GroupEntity } from "@/stores/useSmcrStore";
 import { SMF_ROLES } from "@/lib/smcr-data";
+import { loadDraft, listDrafts } from "@/lib/services/draftService";
 import type { Individual } from "@/lib/validation";
 import type { OrgNode } from "./utils/export-pptx";
 
@@ -686,14 +688,22 @@ function EntityDetailPanel({
   onClose,
   onDelete,
   onUpdate,
+  onLinkFirm,
+  onNavigateToFirm,
 }: {
   entity: GroupEntity;
   onClose: () => void;
   onDelete: () => void;
   onUpdate: (updates: Partial<GroupEntity>) => void;
+  onLinkFirm: (firmId: string) => void;
+  onNavigateToFirm: (firmId: string) => void;
 }) {
   const [isLinkingProject, setIsLinkingProject] = useState(false);
   const [projectInput, setProjectInput] = useState("");
+  const [isLinkingFirm, setIsLinkingFirm] = useState(false);
+  const [availableFirms, setAvailableFirms] = useState<{ id: string; firmName: string }[]>([]);
+  const [loadingFirms, setLoadingFirms] = useState(false);
+  const [selectedFirmId, setSelectedFirmId] = useState("");
 
   const handleLinkProject = () => {
     const trimmed = projectInput.trim();
@@ -701,6 +711,29 @@ function EntityDetailPanel({
       onUpdate({ linkedProjectName: trimmed });
       setProjectInput("");
       setIsLinkingProject(false);
+    }
+  };
+
+  const handleStartLinkFirm = async () => {
+    setIsLinkingFirm(true);
+    setLoadingFirms(true);
+    try {
+      const result = await listDrafts();
+      if (result.success && result.drafts) {
+        setAvailableFirms(result.drafts);
+      }
+    } catch {
+      // Silently fail — user can retry
+    } finally {
+      setLoadingFirms(false);
+    }
+  };
+
+  const handleConfirmLinkFirm = () => {
+    if (selectedFirmId) {
+      onLinkFirm(selectedFirmId);
+      setIsLinkingFirm(false);
+      setSelectedFirmId("");
     }
   };
 
@@ -734,6 +767,75 @@ function EntityDetailPanel({
             {entity.regulatoryStatus}
           </p>
         )}
+
+        {/* Linked SMCR Firm */}
+        {entity.linkedFirmId ? (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-emerald">
+              <LinkIcon className="size-3" />
+              <span>Linked to SMCR firm</span>
+            </div>
+            <button
+              onClick={() => onNavigateToFirm(entity.linkedFirmId!)}
+              className="w-full flex items-center justify-center gap-1 rounded-lg bg-emerald/15 text-emerald text-[10px] py-1.5 font-semibold hover:bg-emerald/25 transition"
+            >
+              <ExternalLink className="size-3" />
+              View People
+            </button>
+          </div>
+        ) : isLinkingFirm ? (
+          <div className="space-y-1.5">
+            {loadingFirms ? (
+              <div className="flex items-center gap-1.5 text-sand/50">
+                <Loader2 className="size-3 animate-spin" />
+                <span>Loading firms...</span>
+              </div>
+            ) : availableFirms.length === 0 ? (
+              <p className="text-sand/40">No saved firms found</p>
+            ) : (
+              <select
+                value={selectedFirmId}
+                onChange={(e) => setSelectedFirmId(e.target.value)}
+                className="w-full rounded-lg border border-white/20 bg-midnight/60 px-2 py-1 text-xs text-sand focus:border-emerald focus:outline-none"
+              >
+                <option value="">Select a firm...</option>
+                {availableFirms.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.firmName}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex gap-1">
+              <button
+                onClick={handleConfirmLinkFirm}
+                disabled={!selectedFirmId}
+                className="flex-1 rounded-lg bg-emerald/80 text-midnight text-[10px] py-1 font-semibold hover:bg-emerald disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Link
+              </button>
+              <button
+                onClick={() => {
+                  setIsLinkingFirm(false);
+                  setSelectedFirmId("");
+                }}
+                className="flex-1 rounded-lg border border-white/20 text-sand/60 text-[10px] py-1 hover:bg-white/5 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleStartLinkFirm}
+            className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300"
+          >
+            <Building className="size-3" />
+            Link to SMCR Firm
+          </button>
+        )}
+
+        {/* Linked Authorization Project */}
         {entity.linkedProjectName ? (
           <div className="flex items-center gap-1 text-emerald">
             <ExternalLink className="size-3" />
@@ -1244,6 +1346,13 @@ export default function OrgChartClient() {
   const addIndividual = useSmcrStore((s) => s.addIndividual);
   const updateIndividual = useSmcrStore((s) => s.updateIndividual);
   const removeIndividual = useSmcrStore((s) => s.removeIndividual);
+  const linkEntityToFirm = useSmcrStore((s) => s.linkEntityToFirm);
+  const setDraftId = useSmcrStore((s) => s.setDraftId);
+  const updateFirmProfile = useSmcrStore((s) => s.updateFirmProfile);
+  const setResponsibilityAssignments = useSmcrStore((s) => s.setResponsibilityAssignments);
+  const setResponsibilityOwners = useSmcrStore((s) => s.setResponsibilityOwners);
+  const setIndividuals = useSmcrStore((s) => s.setIndividuals);
+  const setFitnessResponses = useSmcrStore((s) => s.setFitnessResponses);
 
   const [viewMode, setViewMode] = useState<ViewMode>("people");
   const [highlightedChain, setHighlightedChain] = useState<Set<string>>(
@@ -1254,7 +1363,34 @@ export default function OrgChartClient() {
   const [isExporting, setIsExporting] = useState(false);
   const [personModalMode, setPersonModalMode] = useState<"add" | "edit" | null>(null);
   const [editingPerson, setEditingPerson] = useState<Individual | null>(null);
+  const [isSwitchingFirm, setIsSwitchingFirm] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Navigate to a linked firm: load its data into the store, switch to People View
+  const handleNavigateToFirm = useCallback(async (firmId: string) => {
+    if (isSwitchingFirm) return;
+    setIsSwitchingFirm(true);
+    try {
+      const result = await loadDraft(firmId);
+      if (result.success && result.data) {
+        setDraftId(firmId);
+        updateFirmProfile(result.data.firmProfile);
+        setResponsibilityAssignments(result.data.responsibilityAssignments);
+        setResponsibilityOwners(result.data.responsibilityOwners);
+        setIndividuals(result.data.individuals);
+        setFitnessResponses(result.data.fitnessResponses);
+        localStorage.setItem("smcr_current_draft_id", firmId);
+        setViewMode("people");
+        setSelectedEntityId(null);
+      } else {
+        alert(result.error || "Failed to load linked firm.");
+      }
+    } catch {
+      alert("Failed to load linked firm. Please try again.");
+    } finally {
+      setIsSwitchingFirm(false);
+    }
+  }, [isSwitchingFirm, setDraftId, updateFirmProfile, setResponsibilityAssignments, setResponsibilityOwners, setIndividuals, setFitnessResponses]);
 
   // Build trees
   const peopleTree = useMemo(
@@ -1273,6 +1409,12 @@ export default function OrgChartClient() {
   const handleNodeClick = useCallback(
     (nodeId: string) => {
       if (viewMode === "group") {
+        // If clicking a subsidiary with a linked firm, navigate to it
+        const entity = groupEntities.find((e) => e.id === nodeId);
+        if (entity?.linkedFirmId) {
+          handleNavigateToFirm(entity.linkedFirmId);
+          return;
+        }
         setSelectedEntityId((prev) => (prev === nodeId ? null : nodeId));
         return;
       }
@@ -1299,7 +1441,7 @@ export default function OrgChartClient() {
         return chain;
       });
     },
-    [activeTree, viewMode]
+    [activeTree, viewMode, groupEntities, handleNavigateToFirm]
   );
 
   // Export handlers
@@ -1547,6 +1689,10 @@ export default function OrgChartClient() {
             onUpdate={(updates) =>
               updateGroupEntity(selectedEntity.id, updates)
             }
+            onLinkFirm={(firmId) =>
+              linkEntityToFirm(selectedEntity.id, firmId)
+            }
+            onNavigateToFirm={handleNavigateToFirm}
           />
         </div>
       )}
@@ -1573,6 +1719,16 @@ export default function OrgChartClient() {
             setEditingPerson(null);
           }}
         />
+      )}
+
+      {/* Firm switching overlay */}
+      {isSwitchingFirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="glass-panel px-8 py-6 flex items-center gap-3">
+            <Loader2 className="size-5 animate-spin text-emerald" />
+            <p className="text-sm font-medium text-sand">Loading linked firm...</p>
+          </div>
+        </div>
       )}
     </div>
   );
