@@ -19,6 +19,9 @@ export type Individual = {
   name: string;
   smfRoles: string[]; // Array of SMF roles (e.g., ["SMF1", "SMF3", "SMF16"])
   email?: string;
+  roleTitle?: string; // e.g. "Head of Compliance"
+  department?: string; // e.g. "Compliance", "Risk", "Board"
+  managerId?: string; // ID of the manager individual (for reporting lines)
 };
 
 export type FitnessResponse = {

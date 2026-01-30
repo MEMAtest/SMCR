@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Plus,
   Trash2,
+  Pencil,
   Link as LinkIcon,
   ExternalLink,
   Download,
@@ -17,8 +18,11 @@ import {
   X,
   Network,
   GitBranch,
+  List,
+  FolderOpen,
 } from "lucide-react";
 import { useSmcrStore, type GroupEntity } from "@/stores/useSmcrStore";
+import { SMF_ROLES } from "@/lib/smcr-data";
 import type { Individual } from "@/lib/validation";
 import type { OrgNode } from "./utils/export-pptx";
 
@@ -29,8 +33,7 @@ import type { OrgNode } from "./utils/export-pptx";
 type ViewMode = "people" | "group";
 
 interface OrgPerson extends Individual {
-  department?: string;
-  managerId?: string;
+  resolvedDept?: string; // department after inference fallback
   roleCategory?: "smf" | "cf" | "other";
 }
 
@@ -44,14 +47,14 @@ function buildPeopleTree(
 ): OrgNode {
   const people: OrgPerson[] = individuals.map((ind) => ({
     ...ind,
-    department: extractDepartment(ind),
+    resolvedDept: ind.department || inferDepartment(ind),
     roleCategory: ind.smfRoles.some((r) => r.startsWith("SMF")) ? "smf" : "other",
   }));
 
   // Group by department
   const deptMap = new Map<string, OrgPerson[]>();
   for (const p of people) {
-    const dept = p.department || "Unassigned";
+    const dept = p.resolvedDept || "Unassigned";
     if (!deptMap.has(dept)) deptMap.set(dept, []);
     deptMap.get(dept)!.push(p);
   }
@@ -86,8 +89,8 @@ function buildPeopleTree(
   };
 }
 
-function extractDepartment(ind: Individual): string {
-  // Infer department from SMF roles
+function inferDepartment(ind: Individual): string {
+  // Fallback: infer department from SMF roles when not explicitly set
   for (const role of ind.smfRoles) {
     if (role.includes("Compliance")) return "Compliance";
     if (role.includes("Risk")) return "Risk";
@@ -137,7 +140,7 @@ function buildManagerHierarchy(
       ? allPeople.find((p) => p.id === person.managerId)
       : undefined;
     const crossDept =
-      managerPerson != null && managerPerson.department !== person.department;
+      managerPerson != null && managerPerson.resolvedDept !== person.resolvedDept;
 
     return {
       id: person.id,
@@ -154,7 +157,7 @@ function buildManagerHierarchy(
       crossDepartment: crossDept,
       managerId: person.managerId,
       managerName: managerPerson?.name,
-      department: person.department,
+      department: person.resolvedDept,
     };
   }
 
@@ -845,6 +848,357 @@ function ExportDropdown({
 }
 
 // ---------------------------------------------------------------------------
+// Person Modal (Add / Edit)
+// ---------------------------------------------------------------------------
+
+const DEPARTMENT_OPTIONS = [
+  "Board",
+  "Executive",
+  "Compliance",
+  "Risk",
+  "Audit",
+  "Finance",
+  "Operations",
+  "Financial Crime",
+  "Underwriting",
+  "General",
+];
+
+function PersonModal({
+  mode,
+  person,
+  individuals,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  mode: "add" | "edit";
+  person?: Individual;
+  individuals: Individual[];
+  onSave: (data: Omit<Individual, "id"> & { id?: string }) => void;
+  onDelete?: () => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(person?.name || "");
+  const [roleTitle, setRoleTitle] = useState(person?.roleTitle || "");
+  const [department, setDepartment] = useState(person?.department || "");
+  const [managerId, setManagerId] = useState(person?.managerId || "");
+  const [smfRolesList, setSmfRolesList] = useState<string[]>(person?.smfRoles || []);
+  const [selectedSmfRole, setSelectedSmfRole] = useState("");
+
+  const availableSmfRoles = SMF_ROLES.filter(
+    (r) => !smfRolesList.includes(`${r.ref} - ${r.label}`)
+  );
+
+  const handleAddSmfRole = () => {
+    if (selectedSmfRole && !smfRolesList.includes(selectedSmfRole)) {
+      setSmfRolesList([...smfRolesList, selectedSmfRole]);
+      setSelectedSmfRole("");
+    }
+  };
+
+  const handleRemoveSmfRole = (role: string) => {
+    setSmfRolesList(smfRolesList.filter((r) => r !== role));
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    onSave({
+      ...(mode === "edit" && person ? { id: person.id } : {}),
+      name: name.trim(),
+      roleTitle: roleTitle.trim() || undefined,
+      department: department.trim() || undefined,
+      managerId: managerId || undefined,
+      smfRoles: smfRolesList,
+      email: person?.email,
+    });
+    onClose();
+  };
+
+  // People available as managers (exclude self in edit mode)
+  const managerOptions = individuals.filter(
+    (ind) => !(mode === "edit" && person && ind.id === person.id)
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={mode === "add" ? "Add Person" : "Edit Person"}
+    >
+      <div className="glass-panel p-6 w-full max-w-lg space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-sand">
+              {mode === "add" ? "Add Person" : "Edit Person"}
+            </h3>
+            <p className="text-xs text-sand/50 mt-0.5">
+              {mode === "add"
+                ? "Add a key person to the organisation chart"
+                : "Update this person's details"}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-sand/50 hover:text-sand">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        {/* Full Name */}
+        <label className="block text-sm font-medium text-sand/80">
+          Full Name *
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={100}
+            className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand focus:border-emerald focus:outline-none"
+            placeholder="e.g. Jane Smith"
+            autoFocus
+          />
+        </label>
+
+        {/* Role / Title + Department */}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium text-sand/80">
+            Role / Title
+            <input
+              type="text"
+              value={roleTitle}
+              onChange={(e) => setRoleTitle(e.target.value)}
+              maxLength={100}
+              className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand text-sm focus:border-emerald focus:outline-none"
+              placeholder="e.g. Head of Compliance"
+            />
+          </label>
+          <label className="block text-sm font-medium text-sand/80">
+            Department
+            <input
+              type="text"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              list="dept-suggestions"
+              maxLength={100}
+              className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand text-sm focus:border-emerald focus:outline-none"
+              placeholder="e.g. Compliance"
+            />
+            <datalist id="dept-suggestions">
+              {DEPARTMENT_OPTIONS.map((d) => (
+                <option key={d} value={d} />
+              ))}
+            </datalist>
+          </label>
+        </div>
+
+        {/* Reports To + SMCR Role */}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium text-sand/80">
+            Reports To
+            <select
+              value={managerId}
+              onChange={(e) => setManagerId(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand text-sm focus:border-emerald focus:outline-none"
+            >
+              <option value="">None (top-level)</option>
+              {managerOptions.map((ind) => (
+                <option key={ind.id} value={ind.id}>
+                  {ind.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm font-medium text-sand/80">
+            SMCR Role (optional)
+            <div className="flex gap-1 mt-1">
+              <select
+                value={selectedSmfRole}
+                onChange={(e) => setSelectedSmfRole(e.target.value)}
+                className="flex-1 rounded-xl border border-white/20 bg-midnight/60 px-3 py-2 text-sand text-sm focus:border-emerald focus:outline-none"
+              >
+                <option value="">Select role...</option>
+                {availableSmfRoles.map((r) => (
+                  <option key={r.ref} value={`${r.ref} - ${r.label}`}>
+                    {r.ref} - {r.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAddSmfRole}
+                disabled={!selectedSmfRole}
+                className="shrink-0 rounded-xl border border-white/20 bg-midnight/60 px-2.5 text-emerald hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
+          </label>
+        </div>
+
+        {/* Selected SMF Roles */}
+        {smfRolesList.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {smfRolesList.map((role, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-warning/15 text-warning text-xs font-medium"
+              >
+                {role.split(" - ")[0]}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSmfRole(role)}
+                  className="hover:text-warning/60 transition"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-2">
+          {mode === "edit" && onDelete && (
+            <button
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+              className="rounded-full border border-danger/30 text-danger px-4 py-2 text-sm hover:bg-danger/10 transition"
+            >
+              <Trash2 className="size-4 inline mr-1" />
+              Delete
+            </button>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={onClose}
+            className="rounded-full border border-white/20 text-sand px-5 py-2 text-sm hover:bg-white/5 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!name.trim()}
+            className="rounded-full bg-emerald/90 text-midnight px-5 py-2 text-sm font-semibold hover:bg-emerald disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            {mode === "add" ? "Add Person" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// People List View (department-grouped table)
+// ---------------------------------------------------------------------------
+
+function PeopleListView({
+  individuals,
+  onEditPerson,
+}: {
+  individuals: Individual[];
+  onEditPerson: (person: Individual) => void;
+}) {
+  // Group by department
+  const grouped = useMemo(() => {
+    const map = new Map<string, Individual[]>();
+    for (const ind of individuals) {
+      const dept = ind.department || inferDepartment(ind) || "General";
+      if (!map.has(dept)) map.set(dept, []);
+      map.get(dept)!.push(ind);
+    }
+    const entries = Array.from(map.entries());
+    entries.sort(([a], [b]) => {
+      if (a === "General" || a === "Unassigned") return 1;
+      if (b === "General" || b === "Unassigned") return -1;
+      return a.localeCompare(b);
+    });
+    return entries;
+  }, [individuals]);
+
+  const getManagerName = (managerId?: string) => {
+    if (!managerId) return null;
+    return individuals.find((ind) => ind.id === managerId)?.name || null;
+  };
+
+  const deptColor = (dept: string) => {
+    switch (dept) {
+      case "Board": return "text-purple-400 bg-purple-400/10";
+      case "Executive": return "text-blue-400 bg-blue-400/10";
+      case "Compliance": return "text-emerald bg-emerald/10";
+      case "Risk": return "text-orange-400 bg-orange-400/10";
+      case "Audit": return "text-indigo-400 bg-indigo-400/10";
+      case "Finance": return "text-yellow-400 bg-yellow-400/10";
+      case "Operations": return "text-cyan-400 bg-cyan-400/10";
+      case "Financial Crime": return "text-red-400 bg-red-400/10";
+      case "Underwriting": return "text-pink-400 bg-pink-400/10";
+      default: return "text-sand/60 bg-white/5";
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      {grouped.map(([dept, members]) => (
+        <div key={dept}>
+          {/* Department header */}
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${deptColor(dept)}`}>
+            <FolderOpen className="size-4" />
+            <span className="text-sm font-semibold">{dept}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/10 font-medium">
+              {members.length}
+            </span>
+          </div>
+          {/* People rows */}
+          {members.map((person) => {
+            const mgrName = getManagerName(person.managerId);
+            const smfBadges = person.smfRoles
+              .map((r) => r.split(" - ")[0])
+              .filter(Boolean);
+            return (
+              <button
+                key={person.id}
+                onClick={() => onEditPerson(person)}
+                className="w-full flex items-center gap-3 px-4 py-3 pl-10 hover:bg-white/5 rounded-lg transition text-left group"
+              >
+                <User className="size-5 text-sand/40 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-sand truncate">
+                    {person.name}
+                  </p>
+                  <p className="text-xs text-sand/50 truncate">
+                    {[
+                      person.roleTitle,
+                      mgrName ? `Reports to: ${mgrName}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  </p>
+                </div>
+                {smfBadges.length > 0 && (
+                  <div className="flex gap-1 shrink-0">
+                    {smfBadges.map((badge, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded-md bg-warning/15 text-warning text-xs font-bold"
+                      >
+                        {badge}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Pencil className="size-3.5 text-sand/30 opacity-0 group-hover:opacity-100 transition shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -855,6 +1209,9 @@ export default function OrgChartClient() {
   const addGroupEntity = useSmcrStore((s) => s.addGroupEntity);
   const updateGroupEntity = useSmcrStore((s) => s.updateGroupEntity);
   const removeGroupEntity = useSmcrStore((s) => s.removeGroupEntity);
+  const addIndividual = useSmcrStore((s) => s.addIndividual);
+  const updateIndividual = useSmcrStore((s) => s.updateIndividual);
+  const removeIndividual = useSmcrStore((s) => s.removeIndividual);
 
   const [viewMode, setViewMode] = useState<ViewMode>("people");
   const [highlightedChain, setHighlightedChain] = useState<Set<string>>(
@@ -863,6 +1220,8 @@ export default function OrgChartClient() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [personModalMode, setPersonModalMode] = useState<"add" | "edit" | null>(null);
+  const [editingPerson, setEditingPerson] = useState<Individual | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
 
   // Build trees
@@ -957,6 +1316,32 @@ export default function OrgChartClient() {
     }
   }, [firmProfile.firmName, isExporting]);
 
+  // Person modal handlers
+  const handleOpenAddPerson = () => {
+    setEditingPerson(null);
+    setPersonModalMode("add");
+  };
+  const handleOpenEditPerson = (person: Individual) => {
+    setEditingPerson(person);
+    setPersonModalMode("edit");
+  };
+  const handleSavePerson = (data: Omit<Individual, "id"> & { id?: string }) => {
+    if (personModalMode === "edit" && data.id) {
+      const { id, ...updates } = data;
+      updateIndividual(id, updates);
+    } else {
+      addIndividual({
+        ...data,
+        id: `ind-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      } as Individual);
+    }
+  };
+  const handleDeletePerson = () => {
+    if (editingPerson) {
+      removeIndividual(editingPerson.id);
+    }
+  };
+
   // Selected entity for detail panel
   const selectedEntity = selectedEntityId
     ? groupEntities.find((e) => e.id === selectedEntityId)
@@ -1007,6 +1392,15 @@ export default function OrgChartClient() {
           Group View
         </button>
 
+        {viewMode === "people" && (
+          <button
+            onClick={handleOpenAddPerson}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald/90 text-midnight px-4 py-2 text-sm font-semibold hover:bg-emerald transition ml-auto"
+          >
+            <Plus className="size-4" />
+            Add Person
+          </button>
+        )}
         {viewMode === "group" && (
           <button
             onClick={() => setShowAddDialog(true)}
@@ -1020,18 +1414,20 @@ export default function OrgChartClient() {
 
       {/* Chart Area */}
       <div className="glass-panel p-6 overflow-x-auto">
-        <div
-          ref={chartRef}
-          className="flex justify-center min-w-[600px] py-4"
-        >
+        <div ref={chartRef}>
           {viewMode === "people" && individuals.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <Users className="size-12 text-sand/30 mx-auto" />
               <p className="text-sand/50 text-sm">
-                No individuals added yet. Add SMF individuals in the Builder to
-                see the organisation chart.
+                No individuals added yet. Click &quot;Add Person&quot; to start
+                building your organisation chart.
               </p>
             </div>
+          ) : viewMode === "people" ? (
+            <PeopleListView
+              individuals={individuals}
+              onEditPerson={handleOpenEditPerson}
+            />
           ) : viewMode === "group" && groupEntities.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <Building2 className="size-12 text-sand/30 mx-auto" />
@@ -1041,11 +1437,13 @@ export default function OrgChartClient() {
               </p>
             </div>
           ) : (
-            <TreeNodeRenderer
-              node={activeTree}
-              highlightedChain={highlightedChain}
-              onNodeClick={handleNodeClick}
-            />
+            <div className="flex justify-center min-w-[600px] py-4">
+              <TreeNodeRenderer
+                node={activeTree}
+                highlightedChain={highlightedChain}
+                onNodeClick={handleNodeClick}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -1121,6 +1519,21 @@ export default function OrgChartClient() {
           parentEntities={groupEntities}
           onAdd={addGroupEntity}
           onClose={() => setShowAddDialog(false)}
+        />
+      )}
+
+      {/* Person Modal (Add / Edit) */}
+      {personModalMode && (
+        <PersonModal
+          mode={personModalMode}
+          person={editingPerson || undefined}
+          individuals={individuals}
+          onSave={handleSavePerson}
+          onDelete={personModalMode === "edit" ? handleDeletePerson : undefined}
+          onClose={() => {
+            setPersonModalMode(null);
+            setEditingPerson(null);
+          }}
         />
       )}
     </div>
