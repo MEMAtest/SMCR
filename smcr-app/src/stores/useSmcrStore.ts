@@ -34,6 +34,7 @@ type SmcrState = {
   firmProfile: FirmProfile;
   responsibilityAssignments: Record<string, boolean>;
   responsibilityOwners: Record<string, string>; // responsibility ref -> individual id
+  responsibilityEvidence: Record<string, string>; // responsibility ref -> evidence link/reference/notes
   individuals: Individual[];
   fitnessResponses: FitnessResponse[];
   draftId?: string; // ID of the saved draft
@@ -51,6 +52,8 @@ type SmcrState = {
   setResponsibilityAssignments: (assignments: Record<string, boolean>) => void;
   setResponsibilityOwner: (ref: string, individualId: string) => void;
   setResponsibilityOwners: (owners: Record<string, string>) => void;
+  setResponsibilityEvidence: (ref: string, evidence: string) => void;
+  setResponsibilityEvidenceMap: (evidence: Record<string, string>) => void;
   getResponsibilityCoverage: () => number;
 
   // Actions - individuals
@@ -135,6 +138,7 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
   },
   responsibilityAssignments: defaultAssignments,
   responsibilityOwners: {},
+  responsibilityEvidence: {},
   individuals: [],
   fitnessResponses: [],
   draftId: undefined,
@@ -186,13 +190,25 @@ export const useSmcrStore = create<SmcrState>((set, get) => ({
     get().updateStepStatuses();
   },
 
+  setResponsibilityEvidence: (ref, evidence) => {
+    set((state) => ({
+      responsibilityEvidence: { ...state.responsibilityEvidence, [ref]: evidence },
+    }));
+    get().updateStepStatuses();
+  },
+
+  setResponsibilityEvidenceMap: (evidence) => {
+    set({ responsibilityEvidence: evidence });
+    get().updateStepStatuses();
+  },
+
   getResponsibilityCoverage: () => {
     const state = get();
     const assignments = state.responsibilityAssignments;
     const { firmType, smcrCategory, isCASSFirm } = state.firmProfile;
 
     // Get only applicable PRs based on firm profile
-    const applicablePRs = firmType && smcrCategory
+    const applicablePRs = firmType
       ? getApplicablePRs(firmType, smcrCategory, isCASSFirm || false)
       : PRESCRIBED_RESPONSIBILITIES;
 

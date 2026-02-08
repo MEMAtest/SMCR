@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { getDb } from "@/lib/db";
 import { firms, responsibilities, individuals, fitnessAssessments } from "@/lib/schema";
 import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
@@ -21,6 +21,7 @@ type FirmPayload = {
   };
   responsibilityRefs: string[];
   responsibilityOwners?: Record<string, string>;
+  responsibilityEvidence?: Record<string, string>;
   individuals?: Individual[];
   fitnessResponses?: FitnessResponse[];
 };
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const { firmProfile, responsibilityRefs, responsibilityOwners, individuals: indivs, fitnessResponses } = payload;
+  const { firmProfile, responsibilityRefs, responsibilityOwners, responsibilityEvidence, individuals: indivs, fitnessResponses } = payload;
 
   if (!firmProfile?.firmName || !firmProfile?.firmType) {
     return NextResponse.json(
@@ -51,105 +52,89 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Insert firm
-    const [record] = await db
-      .insert(firms)
-      .values({
+    // Create everything in a single DB batch (Neon HTTP driver transaction).
+    const firmId = randomUUID();
+
+    // Pre-generate individual UUIDs so we can reference them in responsibilities + FIT rows.
+    const newIndividualIds: Record<string, string> = {};
+    const individualRows =
+      indivs && indivs.length > 0
+        ? indivs.map((ind) => {
+            const id = randomUUID();
+            newIndividualIds[ind.id] = id;
+            return {
+              id,
+              firmId,
+              fullName: ind.name,
+              smfRoles: ind.smfRoles,
+              email: ind.email || null,
+            };
+          })
+        : [];
+
+    const responsibilityRows =
+      responsibilityRefs?.length
+        ? responsibilityRefs
+            .filter((ref) => responsibilityMap.has(ref))
+            .map((ref) => {
+              const tempOwnerId = responsibilityOwners?.[ref];
+              const actualOwnerId = tempOwnerId ? newIndividualIds[tempOwnerId] : null;
+
+              return {
+                id: randomUUID(),
+                firmId,
+                reference: ref,
+                title: responsibilityMap.get(ref) ?? ref,
+                status: "assigned",
+                ownerId: actualOwnerId || null,
+                notes: responsibilityEvidence?.[ref] || null,
+              };
+            })
+        : [];
+
+    const fitnessRows =
+      fitnessResponses && fitnessResponses.length > 0 && Object.keys(newIndividualIds).length > 0
+        ? fitnessResponses
+            .map((resp) => {
+              // questionId is "individualId::sectionId::questionId"
+              const [oldIndividualId, sectionId, questionId] = resp.questionId.split("::");
+              const newIndividualId = newIndividualIds[oldIndividualId];
+
+              if (!newIndividualId) {
+                console.warn(`No mapping found for individual ID: ${oldIndividualId}`);
+                return null;
+              }
+
+              // Reconstruct questionId with new UUID
+              const newFitSection = `${newIndividualId}::${sectionId}::${questionId}`;
+
+              return {
+                id: randomUUID(),
+                individualId: newIndividualId,
+                fitSection: newFitSection,
+                response: resp.response,
+                evidenceLinks: resp.evidence ? [resp.evidence] : [],
+              };
+            })
+            .filter((row): row is NonNullable<typeof row> => row !== null)
+        : [];
+
+    const batchQueries = [
+      db.insert(firms).values({
+        id: firmId,
         name: firmProfile.firmName,
         firmType: firmProfile.firmType,
         smcrCategory: firmProfile.smcrCategory,
         isCassFirm: firmProfile.isCASSFirm ?? false,
         optUp: firmProfile.optUp ?? false,
-        jurisdictions: firmProfile.jurisdictions?.length
-          ? firmProfile.jurisdictions
-          : ["UK"],
-      })
-      .returning({ id: firms.id });
+        jurisdictions: firmProfile.jurisdictions?.length ? firmProfile.jurisdictions : ["UK"],
+      }),
+      ...(individualRows.length ? [db.insert(individuals).values(individualRows)] : []),
+      ...(responsibilityRows.length ? [db.insert(responsibilities).values(responsibilityRows)] : []),
+      ...(fitnessRows.length ? [db.insert(fitnessAssessments).values(fitnessRows)] : []),
+    ];
 
-    const firmId = record.id;
-
-    // Insert individuals (SMFs) and capture UUID mapping
-    const newIndividualIds: Record<string, string> = {}; // Map payload ID to DB UUID
-
-    if (indivs && indivs.length > 0) {
-      for (const ind of indivs) {
-        const [inserted] = await db
-          .insert(individuals)
-          .values({
-            firmId,
-            fullName: ind.name,
-            smfRoles: ind.smfRoles,
-            email: ind.email || null,
-          })
-          .returning({ id: individuals.id });
-
-        if (inserted) {
-          newIndividualIds[ind.id] = inserted.id; // Map old ID to new UUID
-        }
-      }
-    }
-
-    // Insert responsibilities with ownership (using mapped UUIDs)
-    if (responsibilityRefs?.length) {
-      const rows = responsibilityRefs
-        .filter((ref) => responsibilityMap.has(ref))
-        .map((ref) => {
-          const tempOwnerId = responsibilityOwners?.[ref];
-          const actualOwnerId = tempOwnerId ? newIndividualIds[tempOwnerId] : null;
-          return {
-            firmId,
-            reference: ref,
-            title: responsibilityMap.get(ref) ?? ref,
-            status: "assigned",
-            ownerId: actualOwnerId || null,
-          };
-        });
-
-      if (rows.length) {
-        await db.insert(responsibilities).values(rows);
-      }
-    }
-
-    // Insert fitness assessments with corrected individual IDs
-    if (fitnessResponses && fitnessResponses.length > 0 && Object.keys(newIndividualIds).length > 0) {
-      const fitnessRows = fitnessResponses
-        .map((resp) => {
-          // New format: questionId is "individualId::sectionId::questionIndex"
-          const [oldIndividualId, sectionId, questionIndex] = resp.questionId.split("::");
-          const newIndividualId = newIndividualIds[oldIndividualId];
-
-          if (!newIndividualId) {
-            console.warn(`No mapping found for individual ID: ${oldIndividualId}`);
-            return null;
-          }
-
-          // Reconstruct questionId with new UUID
-          const newQuestionId = `${newIndividualId}::${sectionId}::${questionIndex}`;
-
-          return {
-            individualId: newIndividualId,
-            fitSection: newQuestionId, // Store full questionId
-            response: resp.response,
-            evidenceLinks: resp.evidence ? [resp.evidence] : [],
-          };
-        })
-        .filter((row: {
-          individualId: string;
-          fitSection: string;
-          response: string;
-          evidenceLinks: string[];
-        } | null): row is {
-          individualId: string;
-          fitSection: string;
-          response: string;
-          evidenceLinks: string[];
-        } => row !== null);
-
-      if (fitnessRows.length > 0) {
-        await db.insert(fitnessAssessments).values(fitnessRows);
-      }
-    }
-
+    await db.batch(batchQueries as any);
     return NextResponse.json({ id: firmId }, { status: 201 });
   } catch (error) {
     console.error("Failed to save firm", error);

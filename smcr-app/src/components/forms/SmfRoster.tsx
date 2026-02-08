@@ -5,7 +5,7 @@ import { useSmcrStore } from "@/stores/useSmcrStore";
 import { UserPlus, Trash2, Users, Info, Pencil } from "lucide-react";
 import type { Individual } from "@/lib/validation";
 import { WizardNavigation } from "@/components/wizard/WizardNavigation";
-import { getApplicableSMFs } from "@/lib/smcr-data";
+import { getApplicableSMFs, getFirmRegime } from "@/lib/smcr-data";
 
 export function SmfRoster() {
   const individuals = useSmcrStore((state) => state.individuals);
@@ -14,9 +14,11 @@ export function SmfRoster() {
   const updateIndividual = useSmcrStore((state) => state.updateIndividual);
   const removeIndividual = useSmcrStore((state) => state.removeIndividual);
 
+  const regime = firmProfile.firmType ? getFirmRegime(firmProfile.firmType) : "SMCR";
+
   // Get applicable SMF roles based on firm profile
   const applicableSmfs = useMemo(() => {
-    if (!firmProfile.firmType || !firmProfile.smcrCategory) {
+    if (!firmProfile.firmType) {
       return [];
     }
     return getApplicableSMFs(firmProfile.firmType, firmProfile.smcrCategory);
@@ -87,13 +89,17 @@ export function SmfRoster() {
     <div className="glass-panel p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-emerald">smf roster</p>
-          <h3 className="text-2xl">Senior Manager Functions</h3>
+          <p className="text-xs uppercase tracking-[0.4em] text-emerald">
+            {regime === "PSD" ? "role roster" : "smf roster"}
+          </p>
+          <h3 className="text-2xl">
+            {regime === "PSD" ? "Key Roles (PSD/EMR)" : "Senior Manager Functions"}
+          </h3>
         </div>
         <Users className="size-8 text-emerald" />
       </div>
       <p className="text-sm text-sand/70">
-        Add individuals who will hold SMF roles and own prescribed responsibilities.
+        Add individuals who will hold key roles and own governance responsibilities.
       </p>
 
       <div className="space-y-3">
@@ -139,7 +145,7 @@ export function SmfRoster() {
 
         {individuals.length === 0 && !isAdding && (
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-8 text-center">
-            <p className="text-sm text-sand/50">No SMF individuals added yet</p>
+            <p className="text-sm text-sand/50">No individuals added yet</p>
           </div>
         )}
       </div>
@@ -161,11 +167,11 @@ export function SmfRoster() {
           </div>
           <div>
             <label className="block text-sm text-sand/80 mb-2">
-              SMF Roles * (select one or more)
+              {regime === "PSD" ? "Roles" : "SMF Roles"} * (select one or more)
             </label>
             {applicableSmfs.length === 0 ? (
               <div className="rounded-lg bg-warning/5 border border-warning/30 p-3 text-sm text-warning">
-                Complete firm profile first to see applicable SMF roles
+                Complete firm profile first to see applicable roles
               </div>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto rounded-lg border border-white/10 bg-midnight/40 p-3">
@@ -239,7 +245,7 @@ export function SmfRoster() {
           className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sand hover:bg-white/5 transition"
         >
           <UserPlus className="size-5" />
-          Add SMF Individual
+          Add Individual
         </button>
       )}
     </div>

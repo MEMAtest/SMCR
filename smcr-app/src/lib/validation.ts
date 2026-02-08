@@ -1,4 +1,4 @@
-import type { JourneyStepKey, FirmTypeKey } from "./smcr-data";
+import { FIT_SECTIONS, getApplicablePRs, getFirmRegime, type JourneyStepKey, type FirmTypeKey } from "./smcr-data";
 
 /**
  * Validation utilities for SMCR wizard steps.
@@ -57,8 +57,15 @@ export function validateFirmProfile(profile: FirmProfile): ValidationResult {
     errors.push("Firm type must be selected");
   }
 
-  if (!profile.smcrCategory) {
-    warnings.push("SMCR category not specified");
+  if (profile.firmType) {
+    const regime = getFirmRegime(profile.firmType);
+    if (!profile.smcrCategory) {
+      if (regime === "SMCR") {
+        errors.push("SMCR category must be selected");
+      } else {
+        warnings.push("Payments category not specified");
+      }
+    }
   }
 
   const isValid = errors.length === 0 && !!profile.firmName && !!profile.firmType;
@@ -73,6 +80,7 @@ export function validateFirmProfile(profile: FirmProfile): ValidationResult {
  * Ideal: All mandatory responsibilities assigned
  */
 export function validateResponsibilities(
+  firmProfile: FirmProfile,
   assignments: Record<string, boolean>,
   individuals: Individual[],
   responsibilityOwners?: Record<string, string> // responsibility ref -> individual id
@@ -80,8 +88,28 @@ export function validateResponsibilities(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  const assignedCount = Object.values(assignments).filter(Boolean).length;
-  const totalCount = Object.keys(assignments).length;
+  if (!firmProfile.firmType) {
+    errors.push("Complete the firm profile to load applicable responsibilities");
+    return { isValid: false, isPartial: false, errors, warnings };
+  }
+
+  const regime = getFirmRegime(firmProfile.firmType);
+  if (regime === "SMCR" && !firmProfile.smcrCategory) {
+    errors.push("Select an SMCR category to load applicable responsibilities");
+    return { isValid: false, isPartial: false, errors, warnings };
+  }
+
+  const applicablePRs = getApplicablePRs(
+    firmProfile.firmType,
+    firmProfile.smcrCategory,
+    firmProfile.isCASSFirm ?? false
+  );
+
+  const applicableRefs = applicablePRs.map((pr) => pr.ref);
+  const applicableSet = new Set(applicableRefs);
+  const assignedRefs = applicableRefs.filter((ref) => assignments[ref]);
+  const assignedCount = assignedRefs.length;
+  const totalCount = applicableRefs.length;
 
   if (assignedCount === 0) {
     errors.push("At least one prescribed responsibility must be selected");
@@ -92,13 +120,16 @@ export function validateResponsibilities(
     errors.push("Add at least one SMF individual to assign responsibilities");
   }
 
+  // Mandatory responsibilities must be selected (should be auto-checked in the UI, but validate defensively)
+  const missingMandatory = applicablePRs.filter((pr) => pr.mandatory && !assignments[pr.ref]).length;
+  if (missingMandatory > 0) {
+    const plural = missingMandatory === 1 ? "mandatory responsibility is" : "mandatory responsibilities are";
+    errors.push(`${missingMandatory} ${plural} not selected`);
+  }
+
   // Check if responsibilities are assigned to individuals
   if (responsibilityOwners && individuals.length > 0) {
     // Count only owners for currently assigned responsibilities
-    const assignedRefs = Object.entries(assignments)
-      .filter(([, value]) => value)
-      .map(([ref]) => ref);
-
     const ownedCount = assignedRefs.filter((ref) => responsibilityOwners[ref]).length;
     const unassignedCount = assignedCount - ownedCount;
 
@@ -106,6 +137,16 @@ export function validateResponsibilities(
       const plural = unassignedCount === 1 ? 'responsibility needs' : 'responsibilities need';
       errors.push(`${unassignedCount} ${plural} an assigned owner`);
     }
+  }
+
+  // Warn if selections exist that are not applicable to the current firm profile
+  const orphanedSelections = Object.entries(assignments)
+    .filter(([, value]) => value)
+    .map(([ref]) => ref)
+    .filter((ref) => !applicableSet.has(ref));
+  if (orphanedSelections.length > 0) {
+    const plural = orphanedSelections.length === 1 ? "selection" : "selections";
+    warnings.push(`${orphanedSelections.length} responsibility ${plural} do not match the current firm profile`);
   }
 
   const isValid = errors.length === 0 && assignedCount > 0;
@@ -131,22 +172,23 @@ export function validateFitnessAssessment(
     return { isValid: false, isPartial: false, errors, warnings };
   }
 
-  const responseCount = fitnessResponses.length;
-  const expectedMinimum = individuals.length * 3; // Assume 3 key FIT sections
+  const totalQuestionsPerIndividual = FIT_SECTIONS.reduce((sum, section) => sum + section.questions.length, 0);
+  const answeredCount = fitnessResponses.filter((r) => r.response && r.response.trim().length > 0).length;
+  const expectedMinimum = individuals.length * totalQuestionsPerIndividual;
 
-  if (responseCount === 0) {
+  if (answeredCount === 0) {
     errors.push("No fitness assessment responses recorded");
-  } else if (responseCount < expectedMinimum) {
-    warnings.push(`${expectedMinimum - responseCount} assessment questions remain incomplete`);
+  } else if (answeredCount < expectedMinimum) {
+    errors.push(`${expectedMinimum - answeredCount} assessment questions remain incomplete`);
   }
 
   const responsesWithEvidence = fitnessResponses.filter((r) => r.evidence?.trim()).length;
-  if (responsesWithEvidence === 0 && responseCount > 0) {
+  if (responsesWithEvidence === 0 && answeredCount > 0) {
     warnings.push("Consider adding evidence links to strengthen your assessment");
   }
 
-  const isValid = errors.length === 0 && responseCount >= expectedMinimum;
-  const isPartial = responseCount > 0 && responseCount < expectedMinimum;
+  const isValid = errors.length === 0 && answeredCount >= expectedMinimum;
+  const isPartial = answeredCount > 0 && answeredCount < expectedMinimum;
 
   return { isValid, isPartial, errors, warnings };
 }
@@ -200,6 +242,7 @@ export function getStepValidation(
       return validateFirmProfile(data.firmProfile);
     case "responsibilities":
       return validateResponsibilities(
+        data.firmProfile,
         data.responsibilityAssignments,
         data.individuals,
         data.responsibilityOwners
@@ -209,6 +252,7 @@ export function getStepValidation(
     case "reports": {
       const firmResult = validateFirmProfile(data.firmProfile);
       const respResult = validateResponsibilities(
+        data.firmProfile,
         data.responsibilityAssignments,
         data.individuals,
         data.responsibilityOwners

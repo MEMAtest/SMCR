@@ -10,7 +10,7 @@ export function DraftLoader() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const { setDraftId, updateFirmProfile, setResponsibilityAssignments, setResponsibilityOwners, setIndividuals, setFitnessResponses } =
+  const { setDraftId, updateFirmProfile, setResponsibilityAssignments, setResponsibilityOwners, setResponsibilityEvidenceMap, setIndividuals, setFitnessResponses } =
     useSmcrStore();
 
   useEffect(() => {
@@ -40,6 +40,7 @@ export function DraftLoader() {
           updateFirmProfile(result.data.firmProfile);
           setResponsibilityAssignments(result.data.responsibilityAssignments);
           setResponsibilityOwners(result.data.responsibilityOwners);
+          setResponsibilityEvidenceMap(result.data.responsibilityEvidence || {});
           setIndividuals(result.data.individuals);
           setFitnessResponses(result.data.fitnessResponses);
 
@@ -62,7 +63,7 @@ export function DraftLoader() {
         setStatus("error");
         setMessage(error instanceof Error ? error.message : "Network error");
       });
-  }, [searchParams, setDraftId, updateFirmProfile, setResponsibilityAssignments, setResponsibilityOwners, setIndividuals, setFitnessResponses]);
+  }, [searchParams, setDraftId, updateFirmProfile, setResponsibilityAssignments, setResponsibilityOwners, setResponsibilityEvidenceMap, setIndividuals, setFitnessResponses]);
 
   if (status === "idle") {
     return null;

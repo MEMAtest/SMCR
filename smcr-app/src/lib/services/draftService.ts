@@ -13,6 +13,7 @@ export type DraftData = {
   firmProfile: FirmProfile;
   responsibilityAssignments: Record<string, boolean>;
   responsibilityOwners: Record<string, string>;
+  responsibilityEvidence: Record<string, string>;
   individuals: Individual[];
   fitnessResponses: FitnessResponse[];
 };
@@ -54,6 +55,7 @@ export async function saveDraft(
           .filter(([, value]) => value)
           .map(([ref]) => ref),
         responsibilityOwners: data.responsibilityOwners,
+        responsibilityEvidence: data.responsibilityEvidence,
         individuals: data.individuals,
         fitnessResponses: data.fitnessResponses,
       }),
@@ -128,10 +130,14 @@ export async function loadDraft(draftId: string): Promise<LoadDraftResult> {
     }
 
     const responsibilityOwners: Record<string, string> = {};
+    const responsibilityEvidence: Record<string, string> = {};
     if (result.responsibilities && Array.isArray(result.responsibilities)) {
-      result.responsibilities.forEach((resp: { ref: string; ownerId: string | null }) => {
+      result.responsibilities.forEach((resp: { ref: string; ownerId: string | null; notes?: string | null }) => {
         if (resp.ownerId) {
           responsibilityOwners[resp.ref] = resp.ownerId;
+        }
+        if (resp.notes && resp.notes.trim().length > 0) {
+          responsibilityEvidence[resp.ref] = resp.notes;
         }
       });
     }
@@ -149,6 +155,7 @@ export async function loadDraft(draftId: string): Promise<LoadDraftResult> {
         },
         responsibilityAssignments,
         responsibilityOwners,
+        responsibilityEvidence,
         individuals: result.individuals || [],
         fitnessResponses: result.fitnessResponses || [],
       },

@@ -1,6 +1,6 @@
 "use client";
 
-import { FIRM_TYPES, SMCR_CATEGORIES } from "@/lib/smcr-data";
+import { FIRM_TYPES, PSD_CATEGORIES, SMCR_CATEGORIES } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { Info, MapPin } from "lucide-react";
 import { WizardNavigation } from "@/components/wizard/WizardNavigation";
@@ -8,6 +8,7 @@ import { WizardNavigation } from "@/components/wizard/WizardNavigation";
 export function FirmProfileForm() {
   const { firmProfile, updateFirmProfile } = useSmcrStore();
   const firmConfig = firmProfile.firmType ? FIRM_TYPES[firmProfile.firmType] : undefined;
+  const isSmcrCategory = (value: string | undefined) => SMCR_CATEGORIES.some((cat) => cat.key === value);
 
   return (
     <div className="glass-panel gradient-border p-6 space-y-6">
@@ -38,7 +39,12 @@ export function FirmProfileForm() {
               onClick={() =>
                 updateFirmProfile({
                   firmType: type.key,
-                  smcrCategory: type.isSoloRegulated ? firmProfile.smcrCategory ?? "core" : "enhanced",
+                  smcrCategory:
+                    type.regime === "PSD"
+                      ? "api"
+                      : type.isSoloRegulated
+                      ? isSmcrCategory(firmProfile.smcrCategory) ? firmProfile.smcrCategory : "core"
+                      : "enhanced",
                 })
               }
               className={`rounded-2xl border px-4 py-4 text-left transition hover:border-emerald/60 ${
@@ -57,7 +63,7 @@ export function FirmProfileForm() {
         </div>
       </div>
 
-      {firmConfig?.isSoloRegulated && (
+      {firmConfig?.regime === "SMCR" && firmConfig?.isSoloRegulated && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <p className="text-sm text-sand/70 mb-2">SM&CR category</p>
           <select
@@ -80,6 +86,27 @@ export function FirmProfileForm() {
             />
             Voluntarily opt up to Enhanced
           </label>
+        </div>
+      )}
+
+      {firmConfig?.regime === "PSD" && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-sm text-sand/70 mb-2">Payments regime category</p>
+          <select
+            value={firmProfile.smcrCategory || "api"}
+            onChange={(e) => updateFirmProfile({ smcrCategory: e.target.value })}
+            className="w-full rounded-xl border border-white/15 bg-midnight px-4 py-3"
+          >
+            {PSD_CATEGORIES.map((cat) => (
+              <option key={cat.key} value={cat.key} className="bg-midnight text-sand">
+                {cat.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-3 text-xs text-sand/60">
+            Note: Payments firms operate under PSD/EMR governance rather than SM&CR. This tool will map key roles and
+            governance responsibilities for the selected category.
+          </p>
         </div>
       )}
 

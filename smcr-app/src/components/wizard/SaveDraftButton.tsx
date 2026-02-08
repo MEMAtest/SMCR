@@ -9,6 +9,7 @@ export function SaveDraftButton() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
   const responsibilityAssignments = useSmcrStore((state) => state.responsibilityAssignments);
   const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
+  const responsibilityEvidence = useSmcrStore((state) => state.responsibilityEvidence);
   const individuals = useSmcrStore((state) => state.individuals);
   const fitnessResponses = useSmcrStore((state) => state.fitnessResponses);
   const draftId = useSmcrStore((state) => state.draftId);
@@ -28,6 +29,7 @@ export function SaveDraftButton() {
         firmProfile,
         responsibilityAssignments,
         responsibilityOwners,
+        responsibilityEvidence,
         individuals,
         fitnessResponses,
       },
@@ -40,6 +42,9 @@ export function SaveDraftButton() {
       if (!draftId) {
         setDraftId(result.draftId);
       }
+      try {
+        localStorage.setItem("smcr_current_draft_id", result.draftId);
+      } catch {}
     } else {
       setStatus("error");
       setMessage(result.error || "Unable to save draft");

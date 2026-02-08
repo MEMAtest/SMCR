@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:logic": "tsc -p tsconfig.logic-tests.json && node .tmp/logic-tests/scripts/logic-tests.js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
+    "@aws-sdk/client-ses": "^3.985.0",
     "@neondatabase/serverless": "^1.0.2",
     "@react-pdf/renderer": "^4.3.1",
     "@vercel/analytics": "^1.5.0",
@@ -22,15 +24,18 @@
     "lucide-react": "^0.553.0",
     "next": "^14.2.33",
     "next-auth": "^4.24.13",
+    "nodemailer": "^7.0.13",
     "pptxgenjs": "^4.0.1",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^3.3.0",
+    "resend": "^6.9.1",
     "tailwind-merge": "^3.3.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.9",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "drizzle-kit": "^0.31.6",

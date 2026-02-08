@@ -1,13 +1,15 @@
 import { AlertTriangle, Award, CheckCircle2, FileText, Landmark, ShieldCheck, Users } from "lucide-react";
 import type { ComponentType } from "react";
 
+export type RegimeKey = "SMCR" | "PSD";
+
 export type FirmTypeKey = "Bank" | "Investment" | "Insurance" | "Payments";
 
 export interface FirmType {
   key: FirmTypeKey;
   label: string;
   description: string;
-  regime: string;
+  regime: RegimeKey;
   icon: ComponentType<{ className?: string }>;
   isSoloRegulated: boolean;
 }
@@ -53,6 +55,18 @@ export const SMCR_CATEGORIES = [
   { key: "enhanced", label: "Enhanced" },
 ] as const;
 
+export const PSD_CATEGORIES = [
+  { key: "spi", label: "Small Payment Institution (SPI)" },
+  { key: "api", label: "Authorised Payment Institution (API)" },
+  { key: "aisp", label: "Account Information Service Provider (AISP)" },
+  { key: "aemi", label: "Authorised E-Money Institution (AEMI)" },
+  { key: "semi", label: "Small E-Money Institution (SEMI)" },
+] as const;
+
+export function getFirmRegime(firmType: FirmTypeKey): RegimeKey {
+  return FIRM_TYPES[firmType]?.regime ?? "SMCR";
+}
+
 export interface PrescribedResponsibility {
   ref: string;
   text: string;
@@ -61,6 +75,8 @@ export interface PrescribedResponsibility {
   firmTypes: FirmTypeKey[];
   cassOnly?: boolean;
   description?: string;
+  /** Defaults to "SMCR". Use "PSD" for payments/e-money governance responsibilities. */
+  regime?: RegimeKey;
 }
 
 export interface SmfRole {
@@ -70,6 +86,8 @@ export interface SmfRole {
   firmTypes: FirmTypeKey[];
   category: "all" | "enhanced" | "core" | "limited";
   isExecutive: boolean;
+  /** Defaults to "SMCR". Use "PSD" for payments/e-money key roles. */
+  regime?: RegimeKey;
 }
 
 export const SMF_ROLES: SmfRole[] = [
@@ -77,7 +95,7 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF1",
     label: "Chief Executive",
     description: "Overall responsibility for the conduct of firm business",
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     category: "all",
     isExecutive: true,
   },
@@ -93,7 +111,7 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF3",
     label: "Executive Director",
     description: "Significant responsibility for the firm's affairs (board member)",
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     category: "all",
     isExecutive: true,
   },
@@ -133,7 +151,7 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF9",
     label: "Chair of the Governing Body",
     description: "Chair of the board of directors",
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     category: "all",
     isExecutive: false,
   },
@@ -189,7 +207,7 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF16",
     label: "Compliance Oversight",
     description: "Responsibility for compliance function oversight",
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     category: "all",
     isExecutive: true,
   },
@@ -197,7 +215,7 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF17",
     label: "Money Laundering Reporting Officer (MLRO)",
     description: "Statutory MLRO responsibility for anti-money laundering",
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     category: "all",
     isExecutive: true,
   },
@@ -205,7 +223,7 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF18",
     label: "Other Overall Responsibility Function",
     description: "Other significant overall responsibility not covered by other SMF roles",
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     category: "all",
     isExecutive: true,
   },
@@ -269,9 +287,68 @@ export const SMF_ROLES: SmfRole[] = [
     ref: "SMF29",
     label: "Limited Scope Function",
     description: "For limited scope SMCR firms",
-    firmTypes: ["Investment", "Payments"],
+    firmTypes: ["Investment"],
     category: "limited",
     isExecutive: true,
+  },
+  // -----------------------------------------------------------------------
+  // PSD / EMR (Payments) roles
+  // These are not SMF roles. They represent key accountable owners under the
+  // Payments Services / E-Money governance perimeter.
+  // -----------------------------------------------------------------------
+  {
+    ref: "PSD-CEO",
+    label: "Chief Executive / Managing Director",
+    description: "Overall responsibility for governance and management of the payments business",
+    firmTypes: ["Payments"],
+    category: "all",
+    isExecutive: true,
+    regime: "PSD",
+  },
+  {
+    ref: "PSD-FIN",
+    label: "Finance Lead",
+    description: "Financial resources, capital/own funds oversight, and safeguarding reconciliation inputs",
+    firmTypes: ["Payments"],
+    category: "all",
+    isExecutive: true,
+    regime: "PSD",
+  },
+  {
+    ref: "PSD-COMP",
+    label: "Compliance Oversight",
+    description: "PSD/EMR compliance framework, FCA liaison, and regulatory change oversight",
+    firmTypes: ["Payments"],
+    category: "all",
+    isExecutive: true,
+    regime: "PSD",
+  },
+  {
+    ref: "PSD-MLRO",
+    label: "Money Laundering Reporting Officer (MLRO)",
+    description: "AML/CTF governance, financial crime risk assessment, and suspicious activity reporting",
+    firmTypes: ["Payments"],
+    category: "all",
+    isExecutive: true,
+    regime: "PSD",
+  },
+  {
+    ref: "PSD-SAFE",
+    label: "Safeguarding Officer",
+    description: "Safeguarding arrangements, reconciliation, and audit evidence for customer funds",
+    firmTypes: ["Payments"],
+    category: "all",
+    isExecutive: true,
+    regime: "PSD",
+  },
+  {
+    ref: "PSD-OPS",
+    label: "Operations & Technology Lead",
+    description: "Operational resilience, incident management, and information security oversight",
+    firmTypes: ["Payments"],
+    category: "all",
+    isExecutive: true,
+    regime: "PSD",
   },
 ];
 
@@ -281,7 +358,7 @@ export const PRESCRIBED_RESPONSIBILITIES: PrescribedResponsibility[] = [
     text: "Responsibility for the firm's performance of its obligations under the senior management regime",
     cat: "all",
     mandatory: true,
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     description: "Overall responsibility for ensuring the firm complies with SMCR requirements",
   },
   {
@@ -289,7 +366,7 @@ export const PRESCRIBED_RESPONSIBILITIES: PrescribedResponsibility[] = [
     text: "Responsibility for the firm's performance of its obligations under the employee certification regime",
     cat: "all",
     mandatory: true,
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     description: "Ensuring certification of staff performing significant harm functions",
   },
   {
@@ -305,7 +382,7 @@ export const PRESCRIBED_RESPONSIBILITIES: PrescribedResponsibility[] = [
     text: "Responsibility for the firm's policies and procedures for countering the risk that the firm might be used to further financial crime",
     cat: "all",
     mandatory: true,
-    firmTypes: ["Bank", "Investment", "Insurance", "Payments"],
+    firmTypes: ["Bank", "Investment", "Insurance"],
     description: "Financial crime framework including anti-money laundering and counter-terrorist financing",
   },
   {
@@ -421,6 +498,83 @@ export const PRESCRIBED_RESPONSIBILITIES: PrescribedResponsibility[] = [
     firmTypes: ["Bank", "Insurance"],
     description: "Group governance for firms that are part of larger corporate structures",
   },
+  // -----------------------------------------------------------------------
+  // PSD / EMR (Payments) governance responsibilities
+  // These are not SMCR Prescribed Responsibilities. They are a practical
+  // accountability checklist aligned to typical PSD/EMR governance themes.
+  // -----------------------------------------------------------------------
+  {
+    ref: "P1",
+    text: "Responsibility for PSD/EMR compliance framework and regulatory engagement",
+    cat: "all",
+    mandatory: true,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Ownership of PSD/EMR policies, compliance monitoring, and FCA communications/notifications",
+  },
+  {
+    ref: "P2",
+    text: "Responsibility for safeguarding arrangements (customer funds)",
+    cat: "all",
+    mandatory: true,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Safeguarding method, reconciliation governance, acknowledgement letters, and audit evidence",
+  },
+  {
+    ref: "P3",
+    text: "Responsibility for financial crime controls (AML/CTF, fraud, sanctions)",
+    cat: "all",
+    mandatory: true,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "AML framework, sanctions screening, fraud monitoring, and suspicious activity reporting oversight",
+  },
+  {
+    ref: "P4",
+    text: "Responsibility for operational resilience and business continuity",
+    cat: "all",
+    mandatory: false,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Incident response, continuity planning, and resilience testing for critical payment services",
+  },
+  {
+    ref: "P5",
+    text: "Responsibility for information security and technology risk",
+    cat: "all",
+    mandatory: false,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Security governance, access controls, change management, and cyber risk oversight",
+  },
+  {
+    ref: "P6",
+    text: "Responsibility for outsourcing and third-party risk",
+    cat: "all",
+    mandatory: false,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Third-party due diligence, contractual controls, exit planning, and oversight of critical suppliers",
+  },
+  {
+    ref: "P7",
+    text: "Responsibility for complaints handling and customer communications",
+    cat: "all",
+    mandatory: false,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Complaints framework, root cause analysis, and customer outcome oversight for payment services",
+  },
+  {
+    ref: "P8",
+    text: "Responsibility for financial resources and regulatory reporting",
+    cat: "all",
+    mandatory: false,
+    firmTypes: ["Payments"],
+    regime: "PSD",
+    description: "Own funds/capital monitoring, liquidity planning, and regulatory reporting processes",
+  },
 ];
 
 /**
@@ -453,6 +607,15 @@ export const SMF_PR_MAPPING: Record<string, string[]> = {
   SMF24: ["M", "O", "Q"], // COO - Outsourcing, Business continuity, IT security
   SMF27: [], // Partner
   SMF29: [], // Limited Scope
+  // ---------------------------------------------------------------------
+  // PSD / EMR (Payments) role -> governance responsibility suggestions
+  // ---------------------------------------------------------------------
+  "PSD-COMP": ["P1", "P7"], // Compliance / regulatory engagement + complaints
+  "PSD-SAFE": ["P2"], // Safeguarding arrangements
+  "PSD-MLRO": ["P3"], // Financial crime controls
+  "PSD-OPS": ["P4", "P5", "P6"], // Ops/tech, resilience, outsourcing
+  "PSD-FIN": ["P8", "P2"], // Financial resources + safeguarding fallback
+  "PSD-CEO": ["P1"], // Overall governance/reg engagement fallback
 };
 
 /**
@@ -460,19 +623,35 @@ export const SMF_PR_MAPPING: Record<string, string[]> = {
  */
 export function getApplicablePRs(
   firmType: FirmTypeKey,
-  smcrCategory: string,
+  smcrCategory: string | undefined,
   isCASSFirm: boolean
 ): PrescribedResponsibility[] {
+  const firmRegime = getFirmRegime(firmType);
+
   return PRESCRIBED_RESPONSIBILITIES.filter((pr) => {
+    const prRegime = pr.regime ?? "SMCR";
+
+    // Match the firm's regime first (SMCR vs PSD)
+    if (prRegime !== firmRegime) {
+      return false;
+    }
+
     // Must apply to this firm type
     if (!pr.firmTypes.includes(firmType)) {
       return false;
+    }
+
+    // PSD responsibilities aren't category-filtered (we treat them as "all")
+    if (firmRegime === "PSD") {
+      return true;
     }
 
     // CASS-only PRs only shown if firm is CASS
     if (pr.cassOnly && !isCASSFirm) {
       return false;
     }
+
+    if (!smcrCategory) return false;
 
     // Category filtering
     if (pr.cat === "all") {
@@ -497,13 +676,27 @@ export function getApplicablePRs(
  */
 export function getApplicableSMFs(
   firmType: FirmTypeKey,
-  smcrCategory: string
+  smcrCategory: string | undefined
 ): SmfRole[] {
+  const firmRegime = getFirmRegime(firmType);
+
   return SMF_ROLES.filter((smf) => {
+    const smfRegime = smf.regime ?? "SMCR";
+
+    if (smfRegime !== firmRegime) {
+      return false;
+    }
+
     // Must apply to this firm type
     if (!smf.firmTypes.includes(firmType)) {
       return false;
     }
+
+    if (firmRegime === "PSD") {
+      return true;
+    }
+
+    if (!smcrCategory) return false;
 
     // Category filtering
     if (smf.category === "all") {
@@ -824,8 +1017,8 @@ export type JourneyStep = {
 };
 
 export const DEFAULT_STEPS: JourneyStep[] = [
-  { id: "firm", title: "Firm Profile", description: "Define firm perimeter & SMCR category", status: "active" },
-  { id: "responsibilities", title: "Responsibilities", description: "Assign SMFs + PRs", status: "pending" },
+  { id: "firm", title: "Firm Profile", description: "Define firm perimeter & category", status: "active" },
+  { id: "responsibilities", title: "Responsibilities", description: "Assign roles + responsibilities", status: "pending" },
   { id: "fitness", title: "Fitness & Propriety", description: "Capture attestations", status: "pending" },
   { id: "reports", title: "Reports", description: "Generate outputs", status: "pending" },
 ];

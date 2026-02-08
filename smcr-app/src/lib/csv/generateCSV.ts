@@ -11,7 +11,8 @@ import type { PrescribedResponsibility } from "@/lib/smcr-data";
 export function generateResponsibilitiesCSV(
   assignedResponsibilities: PrescribedResponsibility[],
   responsibilityOwners: Record<string, string>,
-  individuals: Individual[]
+  individuals: Individual[],
+  responsibilityEvidence?: Record<string, string>
 ): string {
   // CSV headers
   const headers = [
@@ -22,6 +23,7 @@ export function generateResponsibilitiesCSV(
     "Owner Name",
     "Owner SMF Role",
     "Owner Email",
+    "Evidence",
     "Status",
   ];
 
@@ -29,6 +31,7 @@ export function generateResponsibilitiesCSV(
   const rows = assignedResponsibilities.map((resp) => {
     const ownerId = responsibilityOwners[resp.ref];
     const owner = individuals.find((ind) => ind.id === ownerId);
+    const evidence = responsibilityEvidence?.[resp.ref]?.trim();
 
     return [
       resp.ref,
@@ -38,6 +41,7 @@ export function generateResponsibilitiesCSV(
       owner ? `"${owner.name.replace(/"/g, '""')}"` : "Unassigned",
       owner ? `"${owner.smfRoles.join(", ").replace(/"/g, '""')}"` : "–",
       owner?.email ? `"${owner.email.replace(/"/g, '""')}"` : "–",
+      evidence ? `"${evidence.replace(/"/g, '""')}"` : "–",
       owner ? "Assigned" : "Pending Assignment",
     ];
   });
@@ -101,12 +105,14 @@ export function exportResponsibilitiesCSV(
   assignedResponsibilities: PrescribedResponsibility[],
   responsibilityOwners: Record<string, string>,
   individuals: Individual[],
+  responsibilityEvidence: Record<string, string> | undefined,
   firmName?: string
 ): void {
   const csvContent = generateResponsibilitiesCSV(
     assignedResponsibilities,
     responsibilityOwners,
-    individuals
+    individuals,
+    responsibilityEvidence
   );
   const filename = generateCSVFilename(firmName);
   downloadCSV(csvContent, filename);

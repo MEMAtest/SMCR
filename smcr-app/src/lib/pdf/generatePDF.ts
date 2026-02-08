@@ -1,14 +1,10 @@
 import type { SmcrReportPDFProps } from "./SmcrReportPDF";
 
 /**
- * Generates and downloads an SMCR report PDF
- * @param props - The data to include in the PDF report
- * @param filename - The filename for the downloaded PDF (default: "smcr-report.pdf")
+ * Generates an SMCR report PDF blob.
+ * Kept separate so callers can either download it or share it via Web Share API.
  */
-export async function generateAndDownloadPDF(
-  props: SmcrReportPDFProps,
-  filename: string = "smcr-report.pdf"
-): Promise<void> {
+export async function generatePDFBlob(props: SmcrReportPDFProps): Promise<Blob> {
   try {
     // Dynamically import PDF library only when needed (lazy loading)
     const [{ pdf }, { SmcrReportPDF }] = await Promise.all([
@@ -17,23 +13,35 @@ export async function generateAndDownloadPDF(
     ]);
 
     // Generate the PDF blob
-    const blob = await pdf(SmcrReportPDF(props)).toBlob();
-
-    // Create a download link and trigger it
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-
-    // Cleanup
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    return await pdf(SmcrReportPDF(props)).toBlob();
   } catch (error) {
     console.error("Failed to generate PDF:", error);
     throw new Error("Failed to generate PDF report");
   }
+}
+
+/**
+ * Generates and downloads an SMCR report PDF
+ * @param props - The data to include in the PDF report
+ * @param filename - The filename for the downloaded PDF (default: "smcr-report.pdf")
+ */
+export async function generateAndDownloadPDF(
+  props: SmcrReportPDFProps,
+  filename: string = "smcr-report.pdf"
+): Promise<void> {
+  const blob = await generatePDFBlob(props);
+
+  // Create a download link and trigger it
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+
+  // Cleanup
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**

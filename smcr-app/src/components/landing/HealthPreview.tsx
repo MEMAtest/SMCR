@@ -5,6 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, FileText, Users, Shield, CheckSquare } from "lucide-react";
 import { loadDraft, type DraftData } from "@/lib/services/draftService";
+import { FIT_SECTIONS } from "@/lib/smcr-data";
+
+const FIT_QUESTIONS_PER_INDIVIDUAL = FIT_SECTIONS.reduce((sum, section) => sum + section.questions.length, 0);
 
 export function HealthPreview() {
   const [draftData, setDraftData] = useState<DraftData | null>(null);
@@ -32,16 +35,18 @@ export function HealthPreview() {
     ? {
         assignedCount: Object.values(draftData.responsibilityAssignments).filter(Boolean).length,
         totalResponsibilities: Object.keys(draftData.responsibilityAssignments).length,
-        ownedCount: Object.entries(draftData.responsibilityOwners).length,
+        ownedCount: Object.entries(draftData.responsibilityAssignments)
+          .filter(([, selected]) => selected)
+          .map(([ref]) => ref)
+          .filter((ref) => !!draftData.responsibilityOwners[ref]).length,
         individualsCount: draftData.individuals.length,
         fitnessCompletionPct:
-          draftData.individuals.length > 0
-            ? Math.round(
-                (draftData.fitnessResponses.filter((r) => r.response.trim().length > 0).length /
-                  (draftData.individuals.length * 6)) *
-                  100
-              )
-            : 0,
+          (() => {
+            const expected = draftData.individuals.length * FIT_QUESTIONS_PER_INDIVIDUAL;
+            if (expected === 0) return 0;
+            const answered = draftData.fitnessResponses.filter((r) => r.response.trim().length > 0).length;
+            return Math.round((answered / expected) * 100);
+          })(),
       }
     : null;
 

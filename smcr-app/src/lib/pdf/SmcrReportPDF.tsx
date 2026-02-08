@@ -1,211 +1,321 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import type { FirmProfile, Individual, FitnessResponse } from "@/lib/validation";
-import type { PrescribedResponsibility } from "@/lib/smcr-data";
-import { calculateAllRisks, getFirmRiskSummary } from "@/lib/fitness-risk-rating";
+import type { FirmProfile, Individual, FitnessResponse } from "../validation";
+import {
+  FIRM_TYPES,
+  FIT_SECTIONS,
+  PSD_CATEGORIES,
+  SMCR_CATEGORIES,
+  SMF_ROLES,
+  getApplicablePRs,
+  getFirmRegime,
+  type PrescribedResponsibility,
+  type RegimeKey,
+} from "../smcr-data";
+import { calculateAllRisks, getFirmRiskSummary } from "../fitness-risk-rating";
+import { buildNextActions } from "../insights/nextActions";
+import { calculateBoardReadiness } from "../insights/boardReadiness";
 
-// Define PDF styles matching the brand's premium aesthetic
+const BRAND = {
+  ink: "#0F172A",
+  muted: "#64748B",
+  border: "#E2E8F0",
+  bgSoft: "#F8FAFC",
+  accent: "#10B981",
+  accentInk: "#065F46",
+  warningBg: "#FEF3C7",
+  warningInk: "#92400E",
+  dangerBg: "#FEE2E2",
+  dangerInk: "#991B1B",
+};
+
 const styles = StyleSheet.create({
-  page: {
+  coverPage: {
     padding: 48,
     fontFamily: "Helvetica",
-    fontSize: 10,
-    color: "#1A1B26",
+    color: BRAND.ink,
     backgroundColor: "#FFFFFF",
   },
-  header: {
-    marginBottom: 32,
-    paddingBottom: 16,
-    borderBottom: "2 solid #3CCB8B",
+  coverAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 10,
+    backgroundColor: BRAND.accent,
   },
-  title: {
-    fontSize: 28,
+  coverEyebrow: {
+    fontSize: 9,
+    color: BRAND.muted,
+    textTransform: "uppercase",
+    letterSpacing: 1.8,
+    marginTop: 28,
+  },
+  coverTitle: {
+    fontSize: 30,
     fontFamily: "Helvetica-Bold",
-    color: "#1A1B26",
-    marginBottom: 8,
+    marginTop: 12,
   },
-  subtitle: {
-    fontSize: 11,
-    color: "#6B7280",
-    marginBottom: 4,
+  coverFirm: {
+    fontSize: 14,
+    color: BRAND.muted,
+    marginTop: 10,
   },
-  sectionHeader: {
+  coverMeta: {
+    fontSize: 10,
+    color: BRAND.muted,
+    marginTop: 6,
+  },
+  coverGrid: {
+    flexDirection: "row",
+    marginTop: 26,
+  },
+  cardSpaced: {
+    marginRight: 12,
+  },
+  card: {
+    flex: 1,
+    border: `1 solid ${BRAND.border}`,
+    backgroundColor: BRAND.bgSoft,
+    borderRadius: 8,
+    padding: 12,
+  },
+  cardLabel: {
+    fontSize: 8,
+    color: BRAND.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  cardValue: {
     fontSize: 16,
+    marginTop: 6,
     fontFamily: "Helvetica-Bold",
-    color: "#1A1B26",
-    marginTop: 24,
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottom: "1 solid #E5E7EB",
   },
-  subsectionHeader: {
+  cardValueMuted: {
+    fontSize: 10,
+    marginTop: 4,
+    color: BRAND.muted,
+  },
+  coverActions: {
+    marginTop: 18,
+  },
+  coverActionsTitle: {
+    marginTop: 16,
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
-    color: "#3CCB8B",
-    marginTop: 16,
-    marginBottom: 8,
   },
-  table: {
-    display: "flex",
-    width: "100%",
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  tableRow: {
+  coverActionItem: {
     flexDirection: "row",
-    borderBottom: "1 solid #F3F4F6",
-    paddingVertical: 8,
+    alignItems: "flex-start",
+    marginTop: 10,
   },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    marginBottom: 4,
-    fontFamily: "Helvetica-Bold",
-  },
-  tableCell: {
-    flex: 1,
-    paddingHorizontal: 8,
-    fontSize: 9,
-  },
-  tableCellBold: {
-    flex: 1,
-    paddingHorizontal: 8,
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-  },
-  gridContainer: {
-    flexDirection: "row",
-    marginBottom: 16,
-    gap: 16,
-  },
-  gridItem: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 4,
-  },
-  label: {
-    fontSize: 8,
-    color: "#6B7280",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  value: {
-    fontSize: 11,
-    color: "#1A1B26",
-    fontFamily: "Helvetica-Bold",
-  },
-  listItem: {
-    flexDirection: "row",
-    marginBottom: 8,
-    paddingLeft: 8,
-  },
-  bullet: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#E0F2FE",
-    color: "#3CCB8B",
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    display: "flex",
+  coverActionPillBox: {
+    minWidth: 56,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 10,
+    alignSelf: "flex-start",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
-    paddingTop: 4,
-    textAlign: "center",
   },
-  listContent: {
-    flex: 1,
-    paddingTop: 2,
-  },
-  ownerTag: {
+  coverActionPillText: {
     fontSize: 8,
-    color: "#3CCB8B",
-    marginTop: 2,
+    fontFamily: "Helvetica-Bold",
   },
-  statusBadge: {
-    fontSize: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "#D1FAE5",
-    color: "#059669",
-    alignSelf: "flex-start",
-    marginTop: 8,
+  coverActionBody: {
+    flex: 1,
+    paddingTop: 1,
   },
-  warningBadge: {
+  coverActionTitle: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 2,
+  },
+  coverActionDetail: {
     fontSize: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "#FEF3C7",
-    color: "#D97706",
-    alignSelf: "flex-start",
-    marginTop: 8,
+    color: BRAND.muted,
+    lineHeight: 12,
+  },
+  coverDisclaimer: {
+    position: "absolute",
+    bottom: 40,
+    left: 48,
+    right: 48,
+    borderTop: `1 solid ${BRAND.border}`,
+    paddingTop: 12,
+    fontSize: 8,
+    color: BRAND.muted,
+    lineHeight: 11,
+  },
+  page: {
+    paddingTop: 86,
+    paddingBottom: 70,
+    paddingHorizontal: 48,
+    fontFamily: "Helvetica",
+    fontSize: 10,
+    color: BRAND.ink,
+    backgroundColor: "#FFFFFF",
+  },
+  runningHeader: {
+    position: "absolute",
+    top: 32,
+    left: 48,
+    right: 48,
+    paddingBottom: 10,
+    borderBottom: `1 solid ${BRAND.border}`,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  runningTitle: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+  },
+  runningMeta: {
+    fontSize: 9,
+    color: BRAND.muted,
   },
   footer: {
     position: "absolute",
-    bottom: 32,
+    bottom: 28,
     left: 48,
     right: 48,
-    borderTop: "1 solid #E5E7EB",
-    paddingTop: 12,
+    borderTop: `1 solid ${BRAND.border}`,
+    paddingTop: 10,
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     fontSize: 8,
-    color: "#6B7280",
+    color: BRAND.muted,
   },
-  riskBadgeHigh: {
+  sectionTitle: {
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  hint: {
+    fontSize: 9,
+    color: BRAND.muted,
+    marginTop: 2,
+    marginBottom: 8,
+    lineHeight: 12,
+  },
+  actionItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 8,
+    padding: 10,
+    border: `1 solid ${BRAND.border}`,
+    borderRadius: 8,
+    backgroundColor: BRAND.bgSoft,
+  },
+  actionPillBox: {
+    minWidth: 60,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginRight: 10,
+    alignSelf: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionPillText: {
     fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+  },
+  pillBoxBlocker: {
+    backgroundColor: BRAND.dangerBg,
+  },
+  pillTextBlocker: {
+    color: BRAND.dangerInk,
+  },
+  pillBoxWarning: {
+    backgroundColor: BRAND.warningBg,
+  },
+  pillTextWarning: {
+    color: BRAND.warningInk,
+  },
+  pillBoxInfo: {
+    backgroundColor: "#DBEAFE",
+  },
+  pillTextInfo: {
+    color: "#1D4ED8",
+  },
+  actionText: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 2,
+  },
+  actionDetail: {
+    fontSize: 9,
+    color: BRAND.muted,
+    lineHeight: 12,
+  },
+  table: {
+    marginTop: 6,
+    border: `1 solid ${BRAND.border}`,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  tableHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: BRAND.bgSoft,
+    borderBottom: `1 solid ${BRAND.border}`,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottom: `1 solid ${BRAND.border}`,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  th: {
+    fontSize: 8,
+    color: BRAND.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    fontFamily: "Helvetica-Bold",
+  },
+  td: {
+    fontSize: 9,
+    lineHeight: 12,
+  },
+  cellName: { flex: 1.2, paddingRight: 10 },
+  cellRole: { flex: 1.8, paddingRight: 10 },
+  cellSmall: { flex: 0.6, textAlign: "right" },
+  cellRef: { flex: 0.45, paddingRight: 10 },
+  cellResp: { flex: 2.35, paddingRight: 10 },
+  cellOwner: { flex: 1.2 },
+  italics: {
+    fontSize: 9,
+    color: BRAND.muted,
+    fontStyle: "italic",
+    marginTop: 6,
+  },
+  badge: {
+    borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: "#FEE2E2",
-    color: "#DC2626",
-    alignSelf: "flex-start",
-  },
-  riskBadgeMedium: {
     fontSize: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: "#FEF3C7",
-    color: "#F59E0B",
+    fontFamily: "Helvetica-Bold",
     alignSelf: "flex-start",
   },
-  riskBadgeLow: {
-    fontSize: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: "#FEF9C3",
-    color: "#EAB308",
-    alignSelf: "flex-start",
-  },
-  riskBadgeClear: {
-    fontSize: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: "#D1FAE5",
-    color: "#059669",
-    alignSelf: "flex-start",
-  },
-  riskItem: {
-    backgroundColor: "#FEF9F3",
-    padding: 8,
-    marginBottom: 6,
-    borderRadius: 4,
-    borderLeft: "2 solid #F59E0B",
-  },
+  riskHigh: { backgroundColor: BRAND.dangerBg, color: BRAND.dangerInk },
+  riskMedium: { backgroundColor: BRAND.warningBg, color: BRAND.warningInk },
+  riskLow: { backgroundColor: "#FEF9C3", color: "#92400E" },
+  riskClear: { backgroundColor: "#D1FAE5", color: BRAND.accentInk },
 });
 
 export interface SmcrReportPDFProps {
   firmProfile: FirmProfile;
   individuals: Individual[];
+  responsibilityAssignments: Record<string, boolean>;
+  responsibilityEvidence: Record<string, string>;
   assignedResponsibilities: PrescribedResponsibility[];
   responsibilityOwners: Record<string, string>;
   fitnessResponses: FitnessResponse[];
@@ -214,6 +324,8 @@ export interface SmcrReportPDFProps {
 export function SmcrReportPDF({
   firmProfile,
   individuals,
+  responsibilityAssignments,
+  responsibilityEvidence,
   assignedResponsibilities,
   responsibilityOwners,
   fitnessResponses,
@@ -224,18 +336,50 @@ export function SmcrReportPDF({
     year: "numeric",
   });
 
+  const regime: RegimeKey = firmProfile.firmType ? getFirmRegime(firmProfile.firmType) : "SMCR";
+
+  const firmTypeLabel = firmProfile.firmType ? (FIRM_TYPES[firmProfile.firmType]?.label ?? firmProfile.firmType) : "–";
+
+  const categoryLabel = (() => {
+    if (!firmProfile.smcrCategory) return "–";
+    if (regime === "PSD") {
+      return PSD_CATEGORIES.find((c) => c.key === firmProfile.smcrCategory)?.label ?? firmProfile.smcrCategory;
+    }
+    return SMCR_CATEGORIES.find((c) => c.key === firmProfile.smcrCategory)?.label ?? firmProfile.smcrCategory;
+  })();
+
+  const roleLabelByRef = new Map(SMF_ROLES.map((role) => [role.ref, role.label]));
+  const formatRole = (ref: string) => {
+    const label = roleLabelByRef.get(ref);
+    return label ? `${label} (${ref})` : ref;
+  };
+  const formatRoles = (refs: string[]) => (refs.length ? refs.map(formatRole).join(", ") : "–");
+
   const ownedResponsibilities = assignedResponsibilities.filter((pr) => responsibilityOwners[pr.ref]);
   const unassignedCount = assignedResponsibilities.length - ownedResponsibilities.length;
 
-  // Calculate risk assessments
+  const nextActions = buildNextActions({
+    firmProfile,
+    individuals,
+    responsibilityAssignments,
+    responsibilityOwners,
+    responsibilityEvidence,
+    fitnessResponses,
+  }).slice(0, 6);
+
+  // FIT completion stats
+  const fitQuestionsPerIndividual = FIT_SECTIONS.reduce((sum, section) => sum + section.questions.length, 0);
+  const expectedFit = individuals.length * fitQuestionsPerIndividual;
+  const answeredFit = fitnessResponses.filter((r) => r.response && r.response.trim().length > 0).length;
+  const fitCompletion = expectedFit > 0 ? Math.round((answeredFit / expectedFit) * 100) : 0;
+
+  // Risk assessments
   const fitnessData: Record<string, Record<string, any>> = {};
   fitnessResponses.forEach((response) => {
     const parts = response.questionId.split("::");
     if (parts.length === 3) {
       const [individualId, , questionId] = parts;
-      if (!fitnessData[individualId]) {
-        fitnessData[individualId] = {};
-      }
+      if (!fitnessData[individualId]) fitnessData[individualId] = {};
       fitnessData[individualId][questionId] = {
         response: response.response,
         details: response.details,
@@ -246,286 +390,343 @@ export function SmcrReportPDF({
 
   const riskAssessments = calculateAllRisks(individuals, fitnessData);
   const firmRiskSummary = getFirmRiskSummary(riskAssessments);
+  const riskById = new Map(riskAssessments.map((a) => [a.individualId, a]));
 
-  const getRiskBadgeStyle = (level: string) => {
+  const applicableResponsibilities = firmProfile.firmType
+    ? getApplicablePRs(firmProfile.firmType, firmProfile.smcrCategory, firmProfile.isCASSFirm ?? false)
+    : [];
+  const mandatoryApplicable = applicableResponsibilities.filter((r) => r.mandatory);
+  const mandatoryOwnedCount = mandatoryApplicable.filter(
+    (r) => responsibilityAssignments[r.ref] && !!responsibilityOwners[r.ref]
+  ).length;
+
+  const boardReadiness = calculateBoardReadiness({
+    firmProfile,
+    individuals,
+    responsibilityAssignments,
+    responsibilityOwners,
+    responsibilityEvidence,
+    fitnessResponses,
+  });
+  const boardReadinessScore = boardReadiness.score;
+  const evidencePercent = boardReadiness.components.evidenceCompleteness.percent;
+
+  const getRiskStyle = (level: string) => {
     switch (level) {
       case "High":
-        return styles.riskBadgeHigh;
+        return styles.riskHigh;
       case "Medium":
-        return styles.riskBadgeMedium;
+        return styles.riskMedium;
       case "Low":
-        return styles.riskBadgeLow;
+        return styles.riskLow;
       case "Clear":
-        return styles.riskBadgeClear;
       default:
-        return styles.riskBadgeClear;
+        return styles.riskClear;
     }
   };
 
+  const reportTitle = regime === "PSD" ? "Board-ready Governance Report (PSD/EMR)" : "Board-ready SMCR Report";
+  const rolesTitle = regime === "PSD" ? "Key roles" : "Senior manager functions";
+  const responsibilitiesTitle = regime === "PSD" ? "Governance responsibilities" : "Prescribed responsibilities";
+
+  const pillBoxStyleForSeverity = (severity: string) => {
+    switch (severity) {
+      case "blocker":
+        return styles.pillBoxBlocker;
+      case "warning":
+        return styles.pillBoxWarning;
+      default:
+        return styles.pillBoxInfo;
+    }
+  };
+
+  const pillTextStyleForSeverity = (severity: string) => {
+    switch (severity) {
+      case "blocker":
+        return styles.pillTextBlocker;
+      case "warning":
+        return styles.pillTextWarning;
+      default:
+        return styles.pillTextInfo;
+    }
+  };
+
+  const truncate = (value: string, maxLen: number) => {
+    const trimmed = value.trim();
+    if (trimmed.length <= maxLen) return trimmed;
+    return trimmed.slice(0, Math.max(0, maxLen - 1)).trimEnd() + "…";
+  };
+
   return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>SMCR Compliance Report</Text>
-          <Text style={styles.subtitle}>{firmProfile.firmName || "Firm Name Not Provided"}</Text>
-          <Text style={styles.subtitle}>Generated: {today}</Text>
-        </View>
+    <Document title={reportTitle} author="MEMA Consultants">
+      {/* Cover */}
+      <Page size="A4" style={styles.coverPage}>
+        <View style={styles.coverAccent} />
 
-        {/* Executive Summary */}
-        <Text style={styles.sectionHeader}>Executive Summary</Text>
-        <View style={styles.gridContainer}>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>Firm Type</Text>
-            <Text style={styles.value}>{firmProfile.firmType || "–"}</Text>
-          </View>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>SMCR Category</Text>
-            <Text style={styles.value}>{firmProfile.smcrCategory || "–"}</Text>
-          </View>
-        </View>
+        <Text style={styles.coverEyebrow}>MEMA Consultants</Text>
+        <Text style={styles.coverTitle}>{reportTitle}</Text>
+        <Text style={styles.coverFirm}>{firmProfile.firmName || "Firm Name Not Provided"}</Text>
+        <Text style={styles.coverMeta}>Generated: {today}</Text>
 
-        <View style={styles.gridContainer}>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>SMF Individuals</Text>
-            <Text style={styles.value}>{individuals.length}</Text>
+        <View style={styles.coverGrid}>
+          <View style={[styles.card, styles.cardSpaced]}>
+            <Text style={styles.cardLabel}>Firm Type</Text>
+            <Text style={styles.cardValue}>{firmTypeLabel}</Text>
+            <Text style={styles.cardValueMuted}>
+              {regime === "PSD" ? "PSD/EMR perimeter" : "SM&CR perimeter"}
+            </Text>
           </View>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>Assigned Responsibilities</Text>
-            <Text style={styles.value}>{assignedResponsibilities.length}</Text>
-          </View>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>With Owner</Text>
-            <Text style={styles.value}>{ownedResponsibilities.length}</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>{regime === "PSD" ? "Payments Category" : "SMCR Category"}</Text>
+            <Text style={styles.cardValue}>{categoryLabel}</Text>
+            <Text style={styles.cardValueMuted}>
+              {firmProfile.isCASSFirm ? "CASS firm" : "Non-CASS"} · {firmProfile.optUp ? "Opted up" : "Not opted up"}
+            </Text>
           </View>
         </View>
 
-        {unassignedCount > 0 && (
-          <View style={styles.warningBadge}>
-            <Text>{unassignedCount} responsibilities require owner assignment</Text>
+        <View style={styles.coverGrid}>
+          <View style={[styles.card, styles.cardSpaced]}>
+            <Text style={styles.cardLabel}>Individuals</Text>
+            <Text style={styles.cardValue}>{individuals.length}</Text>
+            <Text style={styles.cardValueMuted}>{rolesTitle}</Text>
           </View>
-        )}
-        {unassignedCount === 0 && assignedResponsibilities.length > 0 && (
-          <View style={styles.statusBadge}>
-            <Text>All responsibilities assigned</Text>
+          <View style={[styles.card, styles.cardSpaced]}>
+            <Text style={styles.cardLabel}>Responsibilities Selected</Text>
+            <Text style={styles.cardValue}>{assignedResponsibilities.length}</Text>
+            <Text style={styles.cardValueMuted}>
+              {ownedResponsibilities.length} owned · {unassignedCount} unassigned
+            </Text>
           </View>
-        )}
-
-        {/* Firm Profile Details */}
-        <Text style={styles.sectionHeader}>Firm Profile</Text>
-        <View style={styles.gridContainer}>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>CASS Firm</Text>
-            <Text style={styles.value}>{firmProfile.isCASSFirm ? "Yes" : "No"}</Text>
-          </View>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>Opt-Up Status</Text>
-            <Text style={styles.value}>{firmProfile.optUp ? "Yes" : "No"}</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>FIT Completion</Text>
+            <Text style={styles.cardValue}>{expectedFit > 0 ? `${fitCompletion}%` : "–"}</Text>
+            <Text style={styles.cardValueMuted}>
+              {expectedFit > 0 ? `${answeredFit} / ${expectedFit} answers recorded` : "No FIT questions loaded"}
+            </Text>
           </View>
         </View>
 
-        {/* Senior Manager Functions */}
-        <Text style={styles.sectionHeader}>Senior Manager Functions</Text>
-        {individuals.length === 0 ? (
-          <Text style={{ fontSize: 9, color: "#6B7280", fontStyle: "italic" }}>
-            No SMF individuals added
+        <View style={styles.coverGrid}>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Risk Snapshot</Text>
+            <Text style={styles.cardValue}>
+              {firmRiskSummary.high > 0
+                ? `${firmRiskSummary.high} high`
+                : firmRiskSummary.medium > 0
+                  ? `${firmRiskSummary.medium} medium`
+                  : "No red flags"}
+            </Text>
+            <Text style={styles.cardValueMuted}>
+              High {firmRiskSummary.high} · Medium {firmRiskSummary.medium} · Low {firmRiskSummary.low} · Clear{" "}
+              {firmRiskSummary.clear}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.coverGrid}>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Board readiness</Text>
+            <Text style={styles.cardValue}>{boardReadinessScore} / 100</Text>
+            <Text style={styles.cardValueMuted}>
+              Mandatory owned {mandatoryOwnedCount}/{mandatoryApplicable.length || "–"} · FIT {expectedFit > 0 ? `${fitCompletion}%` : "–"} · Evidence {evidencePercent}% · High {firmRiskSummary.high}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.coverActions}>
+          <Text style={styles.coverActionsTitle}>Priority actions</Text>
+          {nextActions.length === 0 ? (
+            <Text style={styles.italics}>No outstanding actions detected.</Text>
+          ) : (
+            nextActions.map((action) => (
+              <View key={action.id} style={styles.coverActionItem} wrap={false}>
+                <View style={[styles.coverActionPillBox, pillBoxStyleForSeverity(action.severity)]}>
+                  <Text style={[styles.coverActionPillText, pillTextStyleForSeverity(action.severity)]}>
+                    {action.severity.toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.coverActionBody}>
+                  <Text style={styles.coverActionTitle}>{action.title}</Text>
+                  <Text style={styles.coverActionDetail}>{action.detail}</Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        <Text style={styles.coverDisclaimer}>
+          Internal board pack generated by the MEMA tool. Validate against current FCA/PRA expectations and your firm’s
+          governance documents before submission or filing.
+        </Text>
+      </Page>
+
+      {/* Content */}
+      <Page size="A4" style={styles.page} wrap>
+        <View style={styles.runningHeader} fixed>
+          <Text style={styles.runningTitle}>{reportTitle}</Text>
+          <Text style={styles.runningMeta}>
+            {(firmProfile.firmName || "Firm") + " · " + today}
           </Text>
+        </View>
+
+        <View style={styles.footer} fixed>
+          <Text>MEMA Consultants</Text>
+          <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <Text>memaconsultants.com</Text>
+        </View>
+
+        <Text style={styles.sectionTitle}>Priority actions</Text>
+        <Text style={styles.hint}>
+          This section highlights what to fix next to make the board pack complete and defensible.
+        </Text>
+        {nextActions.length === 0 ? (
+          <Text style={styles.italics}>No outstanding actions detected.</Text>
+        ) : (
+          nextActions.map((action) => (
+            <View key={action.id} style={styles.actionItem} wrap={false}>
+              <View style={[styles.actionPillBox, pillBoxStyleForSeverity(action.severity)]}>
+                <Text style={[styles.actionPillText, pillTextStyleForSeverity(action.severity)]}>
+                  {action.severity.toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.actionText}>
+                <Text style={styles.actionTitle}>{action.title}</Text>
+                <Text style={styles.actionDetail}>{action.detail}</Text>
+              </View>
+            </View>
+          ))
+        )}
+
+        <Text style={styles.sectionTitle}>{rolesTitle}</Text>
+        {individuals.length === 0 ? (
+          <Text style={styles.italics}>No individuals added.</Text>
         ) : (
           <View style={styles.table}>
-            <View style={styles.tableHeader}>
-              <Text style={styles.tableCellBold}>Name</Text>
-              <Text style={styles.tableCellBold}>SMF Role</Text>
-              <Text style={styles.tableCellBold}>Owned PRs</Text>
+            <View style={styles.tableHeaderRow}>
+              <Text style={[styles.th, styles.cellName]}>Individual</Text>
+              <Text style={[styles.th, styles.cellRole]}>Role(s)</Text>
+              <Text style={[styles.th, styles.cellSmall]}>Owned</Text>
+              <Text style={[styles.th, styles.cellSmall]}>Risk</Text>
             </View>
-            {individuals.map((individual) => {
+            {individuals.map((individual, idx) => {
               const ownedCount = Object.values(responsibilityOwners).filter((id) => id === individual.id).length;
+              const assessment = riskById.get(individual.id);
+              const riskLevel = assessment?.riskLevel ?? "Clear";
+              const rowStyle =
+                idx === individuals.length - 1
+                  ? [styles.tableRow, { borderBottom: "0 solid transparent" }]
+                  : styles.tableRow;
               return (
-                <View key={individual.id} style={styles.tableRow}>
-                  <Text style={styles.tableCell}>{individual.name}</Text>
-                  <Text style={styles.tableCell}>{individual.smfRoles.join(", ")}</Text>
-                  <Text style={styles.tableCell}>{ownedCount}</Text>
+                <View key={individual.id} style={rowStyle as any}>
+                  <Text style={[styles.td, styles.cellName]}>{individual.name}</Text>
+                  <Text style={[styles.td, styles.cellRole]}>{formatRoles(individual.smfRoles)}</Text>
+                  <Text style={[styles.td, styles.cellSmall]}>{ownedCount}</Text>
+                  <View style={[styles.cellSmall, { alignItems: "flex-end" }] as any}>
+                    <Text style={[styles.badge, getRiskStyle(riskLevel)]}>{riskLevel}</Text>
+                  </View>
                 </View>
               );
             })}
           </View>
         )}
 
-        {/* Prescribed Responsibilities */}
-        <Text style={styles.sectionHeader}>Prescribed Responsibilities</Text>
+        <Text style={styles.sectionTitle}>{responsibilitiesTitle}</Text>
+        <Text style={styles.hint}>
+          Selected responsibilities and the accountable owner. Unassigned items should be resolved before board approval.
+        </Text>
         {assignedResponsibilities.length === 0 ? (
-          <Text style={{ fontSize: 9, color: "#6B7280", fontStyle: "italic" }}>
-            No responsibilities assigned
-          </Text>
+          <Text style={styles.italics}>No responsibilities selected.</Text>
         ) : (
-          assignedResponsibilities.map((resp) => {
-            const owner = individuals.find((ind) => ind.id === responsibilityOwners[resp.ref]);
-            return (
-              <View key={resp.ref} style={styles.listItem}>
-                <Text style={styles.bullet}>{resp.ref}</Text>
-                <View style={styles.listContent}>
-                  <Text style={{ fontSize: 9, color: "#1A1B26" }}>{resp.text}</Text>
-                  {owner ? (
-                    <Text style={styles.ownerTag}>
-                      Owner: {owner.name} ({owner.smfRoles.join(", ")})
+          <View style={styles.table}>
+            <View style={styles.tableHeaderRow}>
+              <Text style={[styles.th, styles.cellRef]}>Ref</Text>
+              <Text style={[styles.th, styles.cellResp]}>Responsibility</Text>
+              <Text style={[styles.th, styles.cellOwner]}>Owner</Text>
+            </View>
+            {assignedResponsibilities.map((resp, idx) => {
+              const owner = individuals.find((ind) => ind.id === responsibilityOwners[resp.ref]);
+              const ownerText = owner ? `${owner.name} — ${formatRoles(owner.smfRoles)}` : "Unassigned";
+              const evidenceRaw = responsibilityEvidence?.[resp.ref] || "";
+              const evidenceText = evidenceRaw.trim().length > 0 ? truncate(evidenceRaw, 90) : "–";
+              const rowStyle =
+                idx === assignedResponsibilities.length - 1
+                  ? [styles.tableRow, { borderBottom: "0 solid transparent" }]
+                  : styles.tableRow;
+              return (
+                <View key={resp.ref} style={rowStyle as any}>
+                  <Text style={[styles.td, styles.cellRef]}>{resp.ref}</Text>
+                  <Text style={[styles.td, styles.cellResp]}>
+                    {resp.text}
+                    {resp.mandatory ? "  (Required)" : ""}
+                  </Text>
+                  <View style={styles.cellOwner as any}>
+                    <Text style={styles.td}>{ownerText}</Text>
+                    <Text style={[styles.td, { fontSize: 8, color: BRAND.muted, marginTop: 2 }] as any}>
+                      Evidence: {evidenceText}
                     </Text>
-                  ) : (
-                    <Text style={{ fontSize: 8, color: "#D97706", marginTop: 2 }}>
-                      No owner assigned
-                    </Text>
-                  )}
+                  </View>
                 </View>
-              </View>
-            );
-          })
+              );
+            })}
+          </View>
         )}
 
-        {/* Fitness & Propriety Assessment */}
-        <Text style={styles.sectionHeader}>Fitness & Propriety Assessment</Text>
-        <View style={styles.gridContainer}>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>Individuals Assessed</Text>
-            <Text style={styles.value}>{individuals.length}</Text>
+        <Text style={styles.sectionTitle}>Fitness & Propriety</Text>
+        <Text style={styles.hint}>
+          Completion and risk snapshot based on FIT 2.1 to 2.3 answers recorded in the tool.
+        </Text>
+
+        <View style={styles.coverGrid}>
+          <View style={[styles.card, styles.cardSpaced]}>
+            <Text style={styles.cardLabel}>FIT completion</Text>
+            <Text style={styles.cardValue}>{expectedFit > 0 ? `${fitCompletion}%` : "–"}</Text>
+            <Text style={styles.cardValueMuted}>
+              {expectedFit > 0 ? `${answeredFit} / ${expectedFit} answers recorded` : "No FIT questions loaded"}
+            </Text>
           </View>
-          <View style={styles.gridItem}>
-            <Text style={styles.label}>Total Responses</Text>
-            <Text style={styles.value}>{fitnessResponses.length}</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Risk counts</Text>
+            <Text style={styles.cardValue}>{firmRiskSummary.total}</Text>
+            <Text style={styles.cardValueMuted}>
+              High {firmRiskSummary.high} · Medium {firmRiskSummary.medium} · Low {firmRiskSummary.low} · Clear{" "}
+              {firmRiskSummary.clear}
+            </Text>
           </View>
         </View>
 
         {individuals.length > 0 && (
           <>
-            <Text style={styles.subsectionHeader}>Assessment Summary by Individual</Text>
+            <Text style={styles.sectionTitle}>Individual FIT summary</Text>
             <View style={styles.table}>
-              <View style={styles.tableHeader}>
-                <Text style={styles.tableCellBold}>Individual</Text>
-                <Text style={styles.tableCellBold}>SMF Role</Text>
-                <Text style={styles.tableCellBold}>Responses</Text>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.th, styles.cellName]}>Individual</Text>
+                <Text style={[styles.th, styles.cellRole]}>Role(s)</Text>
+                <Text style={[styles.th, styles.cellSmall]}>Flags</Text>
+                <Text style={[styles.th, styles.cellSmall]}>Risk</Text>
               </View>
-              {individuals.map((individual) => {
-                const individualResponses = fitnessResponses.filter((r) => {
-                  const [individualId] = r.questionId.split("::");
-                  return individualId === individual.id;
-                }).length;
-
+              {individuals.map((individual, idx) => {
+                const assessment = riskById.get(individual.id);
+                const flags = assessment?.allFlaggedQuestions?.length ?? 0;
+                const riskLevel = assessment?.riskLevel ?? "Clear";
+                const rowStyle =
+                  idx === individuals.length - 1
+                    ? [styles.tableRow, { borderBottom: "0 solid transparent" }]
+                    : styles.tableRow;
                 return (
-                  <View key={individual.id} style={styles.tableRow}>
-                    <Text style={styles.tableCell}>{individual.name}</Text>
-                    <Text style={styles.tableCell}>{individual.smfRoles.join(", ")}</Text>
-                    <Text style={styles.tableCell}>{individualResponses} recorded</Text>
+                  <View key={individual.id} style={rowStyle as any}>
+                    <Text style={[styles.td, styles.cellName]}>{individual.name}</Text>
+                    <Text style={[styles.td, styles.cellRole]}>{formatRoles(individual.smfRoles)}</Text>
+                    <Text style={[styles.td, styles.cellSmall]}>{flags}</Text>
+                    <View style={[styles.cellSmall, { alignItems: "flex-end" }] as any}>
+                      <Text style={[styles.badge, getRiskStyle(riskLevel)]}>{riskLevel}</Text>
+                    </View>
                   </View>
                 );
               })}
             </View>
           </>
         )}
-
-        {/* Risk Assessment */}
-        {riskAssessments.length > 0 && (
-          <>
-            <Text style={styles.sectionHeader}>Fitness & Propriety Risk Assessment</Text>
-
-            {/* Firm-wide Risk Summary */}
-            <Text style={styles.subsectionHeader}>Firm-wide Risk Summary</Text>
-            <View style={styles.gridContainer}>
-              <View style={styles.gridItem}>
-                <Text style={styles.label}>Total Individuals</Text>
-                <Text style={styles.value}>{firmRiskSummary.total}</Text>
-              </View>
-              {firmRiskSummary.high > 0 && (
-                <View style={styles.gridItem}>
-                  <Text style={styles.label}>High Risk</Text>
-                  <Text style={[styles.value, { color: "#DC2626" }]}>{firmRiskSummary.high}</Text>
-                </View>
-              )}
-              {firmRiskSummary.medium > 0 && (
-                <View style={styles.gridItem}>
-                  <Text style={styles.label}>Medium Risk</Text>
-                  <Text style={[styles.value, { color: "#F59E0B" }]}>{firmRiskSummary.medium}</Text>
-                </View>
-              )}
-              {firmRiskSummary.low > 0 && (
-                <View style={styles.gridItem}>
-                  <Text style={styles.label}>Low Risk</Text>
-                  <Text style={[styles.value, { color: "#EAB308" }]}>{firmRiskSummary.low}</Text>
-                </View>
-              )}
-              {firmRiskSummary.clear > 0 && (
-                <View style={styles.gridItem}>
-                  <Text style={styles.label}>Clear</Text>
-                  <Text style={[styles.value, { color: "#059669" }]}>{firmRiskSummary.clear}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Individual Risk Assessments */}
-            <Text style={styles.subsectionHeader}>Individual Risk Assessments</Text>
-            {riskAssessments.map((assessment) => (
-              <View key={assessment.individualId} style={{ marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: "#1A1B26" }}>
-                    {assessment.individualName}
-                  </Text>
-                  <Text style={getRiskBadgeStyle(assessment.riskLevel)}>
-                    {assessment.riskLevel} Risk ({assessment.overallScore} pts)
-                  </Text>
-                </View>
-
-                {/* Section Breakdown */}
-                {assessment.sectionBreakdown.some((section) => section.score > 0) && (
-                  <View style={{ marginTop: 8, marginBottom: 8 }}>
-                    <Text style={{ fontSize: 9, color: "#6B7280", marginBottom: 4 }}>Section Breakdown:</Text>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      {assessment.sectionBreakdown
-                        .filter((section) => section.score > 0)
-                        .map((section) => (
-                          <View key={section.sectionRef} style={{ backgroundColor: "#F9FAFB", padding: 6, borderRadius: 4, flex: 1 }}>
-                            <Text style={{ fontSize: 8, color: "#6B7280" }}>{section.sectionRef}</Text>
-                            <Text style={{ fontSize: 10, fontFamily: "Helvetica-Bold", color: "#1A1B26" }}>
-                              {section.score} pts
-                            </Text>
-                          </View>
-                        ))}
-                    </View>
-                  </View>
-                )}
-
-                {/* Flagged Questions */}
-                {assessment.allFlaggedQuestions.length > 0 && (
-                  <View style={{ marginTop: 8 }}>
-                    <Text style={{ fontSize: 9, color: "#6B7280", marginBottom: 4 }}>Flagged Concerns:</Text>
-                    {assessment.allFlaggedQuestions.map((flagged, idx) => (
-                      <View key={idx} style={styles.riskItem}>
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-                          <Text style={{ fontSize: 8, color: "#1A1B26", flex: 1 }}>{flagged.questionText}</Text>
-                          <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold", color: "#F59E0B" }}>
-                            {flagged.riskWeight} pts
-                          </Text>
-                        </View>
-                        {flagged.details && (
-                          <Text style={{ fontSize: 7, color: "#6B7280", fontStyle: "italic", marginTop: 2 }}>
-                            {flagged.details}
-                          </Text>
-                        )}
-                        {flagged.date && (
-                          <Text style={{ fontSize: 7, color: "#6B7280", marginTop: 2 }}>
-                            Date: {flagged.date}
-                          </Text>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            ))}
-          </>
-        )}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text>Generated with MEMA SMCR Tool | www.memaconsultants.com</Text>
-          <Text>Page 1 of 1</Text>
-          <Text>{today}</Text>
-        </View>
       </Page>
     </Document>
   );

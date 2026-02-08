@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "outDir": ".tmp/pdf-samples",
+    "rootDir": ".",
+    "jsx": "react-jsx",
+    "noEmit": false
+  },
+  "include": ["scripts/send-board-pack-template.ts"],
+  "exclude": ["node_modules", ".next"]
+}
+

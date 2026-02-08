@@ -1,19 +1,25 @@
 "use client";
 
 import { useMemo, useEffect } from "react";
-import { getApplicablePRs } from "@/lib/smcr-data";
+import { getApplicablePRs, getFirmRegime } from "@/lib/smcr-data";
 import { useSmcrStore } from "@/stores/useSmcrStore";
 import { Info, ShieldCheck, ShieldAlert } from "lucide-react";
 import { WizardNavigation } from "@/components/wizard/WizardNavigation";
+import { buildSuggestedResponsibilityRefSet } from "@/lib/insights/responsibilitySuggestions";
 
 export function ResponsibilitiesPreview() {
   const firmProfile = useSmcrStore((state) => state.firmProfile);
+  const individuals = useSmcrStore((state) => state.individuals);
   const assignments = useSmcrStore((state) => state.responsibilityAssignments);
   const setAssignment = useSmcrStore((state) => state.setResponsibilityAssignment);
 
+  const regime = firmProfile.firmType ? getFirmRegime(firmProfile.firmType) : "SMCR";
+  const prefixLabel = regime === "PSD" ? "PSD" : "PR";
+  const responsibilitiesTitle = regime === "PSD" ? "Governance Responsibilities" : "Prescribed Responsibilities";
+
   // Get applicable PRs based on firm profile
   const applicablePRs = useMemo(() => {
-    if (!firmProfile.firmType || !firmProfile.smcrCategory) {
+    if (!firmProfile.firmType) {
       return [];
     }
     return getApplicablePRs(
@@ -26,6 +32,16 @@ export function ResponsibilitiesPreview() {
   const mandatoryPRs = useMemo(() => applicablePRs.filter((pr) => pr.mandatory), [applicablePRs]);
   const optionalPRs = useMemo(() => applicablePRs.filter((pr) => !pr.mandatory), [applicablePRs]);
 
+  const suggestedRefSet = useMemo(() => buildSuggestedResponsibilityRefSet(individuals), [individuals]);
+  const suggestedOptionalPRs = useMemo(
+    () => optionalPRs.filter((pr) => suggestedRefSet.has(pr.ref)),
+    [optionalPRs, suggestedRefSet]
+  );
+  const suggestedOptionalRefSet = useMemo(
+    () => new Set(suggestedOptionalPRs.map((pr) => pr.ref)),
+    [suggestedOptionalPRs]
+  );
+
   // Auto-check mandatory PRs when they first appear
   useEffect(() => {
     mandatoryPRs.forEach((pr) => {
@@ -34,6 +50,14 @@ export function ResponsibilitiesPreview() {
       }
     });
   }, [mandatoryPRs, assignments, setAssignment]);
+
+  const handleSelectSuggested = () => {
+    suggestedOptionalPRs.forEach((pr) => {
+      if (!assignments[pr.ref]) {
+        setAssignment(pr.ref, true);
+      }
+    });
+  };
 
   const assignedCount = useMemo(
     () => applicablePRs.filter((pr) => assignments[pr.ref]).length,
@@ -46,13 +70,13 @@ export function ResponsibilitiesPreview() {
       <div className="glass-panel p-6 space-y-4">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-emerald">step 02</p>
-          <h3 className="text-2xl">Prescribed Responsibilities</h3>
+          <h3 className="text-2xl">{responsibilitiesTitle}</h3>
         </div>
         <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-8 text-center">
           <ShieldAlert className="size-12 text-warning mx-auto mb-3" />
           <p className="text-sm text-warning">Please complete the firm profile first</p>
           <p className="text-xs text-sand/60 mt-1">
-            We need your firm type and SMCR category to show relevant responsibilities
+            We need your firm type and category to show relevant responsibilities
           </p>
         </div>
       </div>
@@ -64,7 +88,7 @@ export function ResponsibilitiesPreview() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-emerald">step 02</p>
-          <h3 className="text-2xl">Prescribed Responsibilities</h3>
+          <h3 className="text-2xl">{responsibilitiesTitle}</h3>
         </div>
         <div className="rounded-full bg-emerald/10 px-4 py-2 text-sm text-emerald">
           {assignedCount} of {applicablePRs.length} selected
@@ -101,7 +125,7 @@ export function ResponsibilitiesPreview() {
               <div className="flex-1">
                 <div className="flex items-start gap-2 mb-1">
                   <p className="font-semibold text-sand flex-1">
-                    PR {item.ref} · {item.text}
+                    {prefixLabel} {item.ref} · {item.text}
                   </p>
                   <span className="inline-flex items-center rounded-full bg-emerald/20 px-2 py-0.5 text-xs font-semibold text-emerald flex-shrink-0">
                     Required
@@ -117,10 +141,21 @@ export function ResponsibilitiesPreview() {
 
       {optionalPRs.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-sand/80 flex items-center gap-2">
-            <ShieldAlert className="size-4" />
-            Optional Responsibilities
-          </h4>
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-sand/80 flex items-center gap-2">
+              <ShieldAlert className="size-4" />
+              Optional Responsibilities
+            </h4>
+            {suggestedOptionalPRs.length > 0 && (
+              <button
+                type="button"
+                onClick={handleSelectSuggested}
+                className="rounded-full border border-emerald/30 bg-emerald/10 px-3 py-1.5 text-xs font-semibold text-emerald hover:bg-emerald/20 transition"
+              >
+                Select suggested ({suggestedOptionalPRs.length})
+              </button>
+            )}
+          </div>
           {optionalPRs.map((item) => (
             <label
               key={item.ref}
@@ -135,11 +170,18 @@ export function ResponsibilitiesPreview() {
               <div className="flex-1">
                 <div className="flex items-start gap-2 mb-1">
                   <p className="font-semibold text-sand flex-1">
-                    PR {item.ref} · {item.text}
+                    {prefixLabel} {item.ref} · {item.text}
                   </p>
-                  <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-sand/70 flex-shrink-0">
-                    Optional
-                  </span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {suggestedOptionalRefSet.has(item.ref) && (
+                      <span className="inline-flex items-center rounded-full bg-emerald/15 px-2 py-0.5 text-xs font-semibold text-emerald flex-shrink-0">
+                        Suggested
+                      </span>
+                    )}
+                    <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-sand/70 flex-shrink-0">
+                      Optional
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-sand/60 mt-1">{item.description}</p>
                 {item.cassOnly && (

@@ -1,22 +1,54 @@
 "use client";
 
 import { useSmcrStore } from "@/stores/useSmcrStore";
-import { PRESCRIBED_RESPONSIBILITIES } from "@/lib/smcr-data";
+import { getApplicablePRs, getFirmRegime } from "@/lib/smcr-data";
 import { Network, CheckCircle2, AlertCircle } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { WizardNavigation } from "@/components/wizard/WizardNavigation";
+import { buildOwnerSuggestions } from "@/lib/insights/responsibilitySuggestions";
 
 export function ResponsibilityMatrix() {
+  const firmProfile = useSmcrStore((state) => state.firmProfile);
   const individuals = useSmcrStore((state) => state.individuals);
   const responsibilityAssignments = useSmcrStore((state) => state.responsibilityAssignments);
   const responsibilityOwners = useSmcrStore((state) => state.responsibilityOwners);
   const setResponsibilityOwner = useSmcrStore((state) => state.setResponsibilityOwner);
+  const setResponsibilityOwners = useSmcrStore((state) => state.setResponsibilityOwners);
+  const responsibilityEvidence = useSmcrStore((state) => state.responsibilityEvidence);
+  const setResponsibilityEvidence = useSmcrStore((state) => state.setResponsibilityEvidence);
+  const setResponsibilityAssignments = useSmcrStore((state) => state.setResponsibilityAssignments);
+  const setResponsibilityEvidenceMap = useSmcrStore((state) => state.setResponsibilityEvidenceMap);
 
-  // Filter to only show assigned responsibilities
-  const assignedResponsibilities = useMemo(
-    () => PRESCRIBED_RESPONSIBILITIES.filter((pr) => responsibilityAssignments[pr.ref]),
-    [responsibilityAssignments]
+  const [suggestionNotice, setSuggestionNotice] = useState<string>("");
+
+  const regime = firmProfile.firmType ? getFirmRegime(firmProfile.firmType) : "SMCR";
+  const prefixLabel = regime === "PSD" ? "PSD" : "PR";
+
+  const applicableResponsibilities = useMemo(() => {
+    if (!firmProfile.firmType) return [];
+    return getApplicablePRs(
+      firmProfile.firmType,
+      firmProfile.smcrCategory,
+      firmProfile.isCASSFirm ?? false
+    );
+  }, [firmProfile.firmType, firmProfile.smcrCategory, firmProfile.isCASSFirm]);
+
+  const applicableRefs = useMemo(
+    () => new Set(applicableResponsibilities.map((r) => r.ref)),
+    [applicableResponsibilities]
   );
+
+  // Filter to only show assigned responsibilities (prefer applicable ones; orphaned selections shown separately)
+  const assignedResponsibilities = useMemo(() => {
+    return applicableResponsibilities.filter((pr) => responsibilityAssignments[pr.ref]);
+  }, [applicableResponsibilities, responsibilityAssignments]);
+
+  const orphanedResponsibilities = useMemo(() => {
+    const selected = Object.entries(responsibilityAssignments)
+      .filter(([, value]) => value)
+      .map(([ref]) => ref);
+    return selected.filter((ref) => !applicableRefs.has(ref));
+  }, [responsibilityAssignments, applicableRefs]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -27,6 +59,52 @@ export function ResponsibilityMatrix() {
 
     return { total, owned, unassigned };
   }, [assignedResponsibilities, responsibilityOwners]);
+
+  const ownerSuggestions = useMemo(() => {
+    return buildOwnerSuggestions({
+      assignedResponsibilities,
+      individuals,
+      responsibilityOwners,
+    });
+  }, [assignedResponsibilities, individuals, responsibilityOwners]);
+
+  const handleApplySuggestions = () => {
+    setSuggestionNotice("");
+    if (ownerSuggestions.length === 0) {
+      setSuggestionNotice("No suggestions available yet.");
+      return;
+    }
+
+    const nextOwners = { ...responsibilityOwners };
+    let applied = 0;
+
+    for (const suggestion of ownerSuggestions) {
+      if (nextOwners[suggestion.ref]) continue;
+      nextOwners[suggestion.ref] = suggestion.suggestedOwnerId;
+      applied++;
+    }
+
+    setResponsibilityOwners(nextOwners);
+    setSuggestionNotice(applied > 0 ? `Applied ${applied} suggestion${applied === 1 ? "" : "s"}.` : "Nothing to apply.");
+  };
+
+  const handleClearOrphanedSelections = () => {
+    if (orphanedResponsibilities.length === 0) return;
+
+    const nextAssignments = { ...responsibilityAssignments };
+    const nextOwners = { ...responsibilityOwners };
+    const nextEvidence = { ...responsibilityEvidence };
+
+    for (const ref of orphanedResponsibilities) {
+      nextAssignments[ref] = false;
+      delete nextOwners[ref];
+      delete nextEvidence[ref];
+    }
+
+    setResponsibilityAssignments(nextAssignments);
+    setResponsibilityOwners(nextOwners);
+    setResponsibilityEvidenceMap(nextEvidence);
+  };
 
   const getOwnerName = (ref: string) => {
     const ownerId = responsibilityOwners[ref];
@@ -50,7 +128,9 @@ export function ResponsibilityMatrix() {
           <Network className="size-8 text-emerald" />
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-8 text-center">
-          <p className="text-sm text-sand/50">Select prescribed responsibilities in the checklist above to assign owners</p>
+          <p className="text-sm text-sand/50">
+            Select responsibilities in the checklist above to assign owners
+          </p>
         </div>
       </div>
     );
@@ -69,7 +149,7 @@ export function ResponsibilityMatrix() {
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center">
           <p className="text-2xl font-semibold text-sand">{stats.total}</p>
-          <p className="text-xs text-sand/70">Total assigned</p>
+          <p className="text-xs text-sand/70">Assigned</p>
         </div>
         <div className="rounded-2xl border border-emerald/40 bg-emerald/5 px-4 py-3 text-center">
           <p className="text-2xl font-semibold text-emerald">{stats.owned}</p>
@@ -80,6 +160,66 @@ export function ResponsibilityMatrix() {
           <p className="text-xs text-sand/70">Unassigned</p>
         </div>
       </div>
+
+      {ownerSuggestions.length > 0 && (
+        <div className="rounded-2xl border border-emerald/20 bg-emerald/5 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-emerald">Suggested owners</p>
+              <p className="text-xs text-sand/60">
+                Based on selected roles, the tool can suggest who should own each {prefixLabel}.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleApplySuggestions}
+              className="shrink-0 rounded-full bg-emerald/90 text-midnight px-4 py-2 text-xs font-semibold hover:bg-emerald transition"
+            >
+              Apply suggestions
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {ownerSuggestions.slice(0, 6).map((s) => (
+              <div key={s.ref} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-sm text-sand">
+                  <span className="font-semibold text-emerald">{prefixLabel} {s.ref}</span>{" "}
+                  <span className="text-sand/60">suggested owner:</span>{" "}
+                  <span className="font-semibold">{s.suggestedOwnerName}</span>
+                </p>
+                <p className="text-xs text-sand/60 mt-0.5">
+                  Reason: {s.reasons.join(", ")}
+                </p>
+              </div>
+            ))}
+            {ownerSuggestions.length > 6 && (
+              <p className="text-xs text-sand/60">Showing 6 of {ownerSuggestions.length} suggestions.</p>
+            )}
+          </div>
+
+          {suggestionNotice && <p className="text-xs text-emerald">{suggestionNotice}</p>}
+        </div>
+      )}
+
+      {orphanedResponsibilities.length > 0 && (
+        <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-warning">Non-applicable selections</p>
+              <p className="text-xs text-sand/60 mt-1">
+                {orphanedResponsibilities.length} selected {orphanedResponsibilities.length === 1 ? "responsibility" : "responsibilities"} no longer match the current firm profile.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleClearOrphanedSelections}
+              className="shrink-0 rounded-full border border-warning/30 px-4 py-2 text-xs font-semibold text-warning hover:bg-warning/5 transition"
+            >
+              Clear selections
+            </button>
+          </div>
+        </div>
+      )}
 
       {individuals.length === 0 ? (
         <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3">
@@ -139,6 +279,19 @@ export function ResponsibilityMatrix() {
                     </button>
                   )}
                 </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs text-sand/60">
+                    Evidence link / document reference (optional)
+                    <input
+                      type="text"
+                      className="mt-1 w-full rounded-2xl border border-white/20 bg-midnight/60 px-4 py-2 text-sm text-sand focus:border-emerald focus:outline-none"
+                      placeholder="https://... or document reference"
+                      value={responsibilityEvidence[responsibility.ref] || ""}
+                      onChange={(e) => setResponsibilityEvidence(responsibility.ref, e.target.value)}
+                    />
+                  </label>
+                </div>
               </div>
             );
           })}
@@ -149,7 +302,7 @@ export function ResponsibilityMatrix() {
         <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3 flex items-center gap-3">
           <AlertCircle className="size-5 text-warning flex-shrink-0" />
           <p className="text-sm text-warning">
-            {stats.unassigned} responsibility/responsibilities still need an assigned owner
+            {stats.unassigned} {stats.unassigned === 1 ? "responsibility still needs" : "responsibilities still need"} an assigned owner
           </p>
         </div>
       )}
