@@ -60,9 +60,9 @@ async function testScenario1() {
     responsibilityRefs: ['A', 'B'],
     responsibilityOwners: {},
     individuals: [
-      { id: 'temp-1', name: 'Alice Smith', smfRole: 'SMF16', email: 'alice@test.com' },
-      { id: 'temp-2', name: 'Bob Jones', smfRole: 'SMF17', email: 'bob@test.com' },
-      { id: 'temp-3', name: 'Carol White', smfRole: 'SMF1', email: 'carol@test.com' },
+      { id: 'temp-1', name: 'Alice Smith', smfRoles: ['SMF16'], email: 'alice@test.com' },
+      { id: 'temp-2', name: 'Bob Jones', smfRoles: ['SMF17'], email: 'bob@test.com' },
+      { id: 'temp-3', name: 'Carol White', smfRoles: ['SMF1'], email: 'carol@test.com' },
     ],
     fitnessResponses: [
       { questionId: 'temp-1::honesty::0', sectionId: 'honesty', response: 'Alice is honest', evidence: 'evidence1.pdf' },
@@ -98,10 +98,10 @@ async function testScenario1() {
     responsibilityRefs: ['A', 'B'],
     responsibilityOwners: {},
     individuals: [
-      { id: 'temp-1', name: 'Alice Smith', smfRole: 'SMF16', email: 'alice@test.com' },
-      { id: 'temp-3', name: 'Carol White', smfRole: 'SMF1', email: 'carol@test.com' },
-      { id: 'temp-4', name: 'David Brown', smfRole: 'SMF18', email: 'david@test.com' },
-      { id: 'temp-5', name: 'Eve Green', smfRole: 'SMF2', email: 'eve@test.com' },
+      { id: 'temp-1', name: 'Alice Smith', smfRoles: ['SMF16'], email: 'alice@test.com' },
+      { id: 'temp-3', name: 'Carol White', smfRoles: ['SMF1'], email: 'carol@test.com' },
+      { id: 'temp-4', name: 'David Brown', smfRoles: ['SMF18'], email: 'david@test.com' },
+      { id: 'temp-5', name: 'Eve Green', smfRoles: ['SMF2'], email: 'eve@test.com' },
     ],
     fitnessResponses: [
       // Keep Alice's responses (temp-1)
@@ -165,8 +165,8 @@ async function testScenario2() {
       'C': 'temp-2',
     },
     individuals: [
-      { id: 'temp-1', name: 'Individual A', smfRole: 'SMF16', email: 'a@test.com' },
-      { id: 'temp-2', name: 'Individual B', smfRole: 'SMF17', email: 'b@test.com' },
+      { id: 'temp-1', name: 'Individual A', smfRoles: ['SMF16'], email: 'a@test.com' },
+      { id: 'temp-2', name: 'Individual B', smfRoles: ['SMF17'], email: 'b@test.com' },
     ],
     fitnessResponses: [],
   };
@@ -187,7 +187,7 @@ async function testScenario2() {
   const updatePayload1 = {
     ...initialPayload,
     individuals: [
-      { id: 'temp-2', name: 'Individual B', smfRole: 'SMF17', email: 'b@test.com' },
+      { id: 'temp-2', name: 'Individual B', smfRoles: ['SMF17'], email: 'b@test.com' },
     ],
     responsibilityOwners: {
       'C': 'temp-2', // Only B's assignments remain
@@ -249,8 +249,8 @@ async function testScenario3() {
       'D': 'temp-2',
     },
     individuals: [
-      { id: 'temp-1', name: 'John Doe', smfRole: 'SMF1', email: 'john@test.com' },
-      { id: 'temp-2', name: 'Jane Smith', smfRole: 'SMF16', email: 'jane@test.com' },
+      { id: 'temp-1', name: 'John Doe', smfRoles: ['SMF1'], email: 'john@test.com' },
+      { id: 'temp-2', name: 'Jane Smith', smfRoles: ['SMF16'], email: 'jane@test.com' },
     ],
     fitnessResponses: [
       { questionId: 'temp-1::honesty::0', sectionId: 'honesty', response: 'John honesty check', evidence: 'john-honesty.pdf' },
