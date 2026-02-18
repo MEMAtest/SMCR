@@ -103,38 +103,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
   },
-  coverActionItem: {
+  coverActionCard: {
+    marginTop: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: BRAND.border,
+    borderRadius: 8,
+  },
+  coverActionHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    marginTop: 10,
-  },
-  coverActionPillBox: {
-    minWidth: 56,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 10,
-    alignSelf: "flex-start",
     alignItems: "center",
-    justifyContent: "center",
   },
-  coverActionPillText: {
-    fontSize: 8,
+  coverActionChip: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 8,
+  },
+  coverActionChipText: {
+    fontSize: 7,
     fontFamily: "Helvetica-Bold",
-  },
-  coverActionBody: {
-    flex: 1,
-    paddingTop: 1,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   coverActionTitle: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 2,
+    flex: 1,
   },
   coverActionDetail: {
     fontSize: 9,
     color: BRAND.muted,
     lineHeight: 12,
+    marginTop: 4,
   },
   coverDisclaimer: {
     position: "absolute",
@@ -201,59 +203,41 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 12,
   },
-  actionItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
+  actionCard: {
     marginTop: 8,
     padding: 10,
-    border: `1 solid ${BRAND.border}`,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: BRAND.border,
     borderRadius: 8,
     backgroundColor: BRAND.bgSoft,
   },
-  actionPillBox: {
-    minWidth: 60,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 10,
-    alignSelf: "flex-start",
+  actionHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
   },
-  actionPillText: {
-    fontSize: 8,
+  actionChip: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 8,
+  },
+  actionChipText: {
+    fontSize: 7,
     fontFamily: "Helvetica-Bold",
-  },
-  pillBoxBlocker: {
-    backgroundColor: BRAND.dangerBg,
-  },
-  pillTextBlocker: {
-    color: BRAND.dangerInk,
-  },
-  pillBoxWarning: {
-    backgroundColor: BRAND.warningBg,
-  },
-  pillTextWarning: {
-    color: BRAND.warningInk,
-  },
-  pillBoxInfo: {
-    backgroundColor: "#DBEAFE",
-  },
-  pillTextInfo: {
-    color: "#1D4ED8",
-  },
-  actionText: {
-    flex: 1,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   actionTitle: {
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 2,
+    flex: 1,
   },
   actionDetail: {
     fontSize: 9,
     color: BRAND.muted,
     lineHeight: 12,
+    marginTop: 4,
   },
   table: {
     marginTop: 6,
@@ -429,25 +413,29 @@ export function SmcrReportPDF({
   const rolesTitle = regime === "PSD" ? "Key roles" : "Senior manager functions";
   const responsibilitiesTitle = regime === "PSD" ? "Governance responsibilities" : "Prescribed responsibilities";
 
-  const pillBoxStyleForSeverity = (severity: string) => {
+  const actionToneForSeverity = (severity: string) => {
     switch (severity) {
       case "blocker":
-        return styles.pillBoxBlocker;
+        return {
+          cardBg: "#FFF7F7",
+          cardBorder: "#FECACA",
+          chipBg: BRAND.dangerBg,
+          chipInk: BRAND.dangerInk,
+        };
       case "warning":
-        return styles.pillBoxWarning;
+        return {
+          cardBg: "#FFFBEB",
+          cardBorder: "#FDE68A",
+          chipBg: BRAND.warningBg,
+          chipInk: BRAND.warningInk,
+        };
       default:
-        return styles.pillBoxInfo;
-    }
-  };
-
-  const pillTextStyleForSeverity = (severity: string) => {
-    switch (severity) {
-      case "blocker":
-        return styles.pillTextBlocker;
-      case "warning":
-        return styles.pillTextWarning;
-      default:
-        return styles.pillTextInfo;
+        return {
+          cardBg: "#EFF6FF",
+          cardBorder: "#BFDBFE",
+          chipBg: "#DBEAFE",
+          chipInk: "#1D4ED8",
+        };
     }
   };
 
@@ -539,19 +527,29 @@ export function SmcrReportPDF({
           {nextActions.length === 0 ? (
             <Text style={styles.italics}>No outstanding actions detected.</Text>
           ) : (
-            nextActions.map((action) => (
-              <View key={action.id} style={styles.coverActionItem} wrap={false}>
-                <View style={[styles.coverActionPillBox, pillBoxStyleForSeverity(action.severity)]}>
-                  <Text style={[styles.coverActionPillText, pillTextStyleForSeverity(action.severity)]}>
-                    {action.severity.toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.coverActionBody}>
-                  <Text style={styles.coverActionTitle}>{action.title}</Text>
+            nextActions.map((action) => {
+              const tone = actionToneForSeverity(action.severity);
+              return (
+                <View
+                  key={action.id}
+                  style={[
+                    styles.coverActionCard,
+                    { backgroundColor: tone.cardBg, borderColor: tone.cardBorder },
+                  ]}
+                  wrap={false}
+                >
+                  <View style={styles.coverActionHeader}>
+                    <View style={[styles.coverActionChip, { backgroundColor: tone.chipBg }]}>
+                      <Text style={[styles.coverActionChipText, { color: tone.chipInk }]}>
+                        {action.severity.toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.coverActionTitle}>{action.title}</Text>
+                  </View>
                   <Text style={styles.coverActionDetail}>{action.detail}</Text>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
 
@@ -583,19 +581,26 @@ export function SmcrReportPDF({
         {nextActions.length === 0 ? (
           <Text style={styles.italics}>No outstanding actions detected.</Text>
         ) : (
-          nextActions.map((action) => (
-            <View key={action.id} style={styles.actionItem} wrap={false}>
-              <View style={[styles.actionPillBox, pillBoxStyleForSeverity(action.severity)]}>
-                <Text style={[styles.actionPillText, pillTextStyleForSeverity(action.severity)]}>
-                  {action.severity.toUpperCase()}
-                </Text>
-              </View>
-              <View style={styles.actionText}>
-                <Text style={styles.actionTitle}>{action.title}</Text>
+          nextActions.map((action) => {
+            const tone = actionToneForSeverity(action.severity);
+            return (
+              <View
+                key={action.id}
+                style={[styles.actionCard, { backgroundColor: tone.cardBg, borderColor: tone.cardBorder }]}
+                wrap={false}
+              >
+                <View style={styles.actionHeader}>
+                  <View style={[styles.actionChip, { backgroundColor: tone.chipBg }]}>
+                    <Text style={[styles.actionChipText, { color: tone.chipInk }]}>
+                      {action.severity.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.actionTitle}>{action.title}</Text>
+                </View>
                 <Text style={styles.actionDetail}>{action.detail}</Text>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
 
         <Text style={styles.sectionTitle}>{rolesTitle}</Text>
