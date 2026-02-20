@@ -1,9 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="50" r="50" fill="#1a1a2e"/>
-  <path d="M25 70 L25 35 L38 55 L50 35 L62 55 L75 35 L75 70"
-        stroke="#4ade80"
-        stroke-width="6"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="MEMA favicon">
+  <defs>
+    <linearGradient id="memaGlyph" x1="20" y1="16" x2="108" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#34D399" />
+      <stop offset="1" stop-color="#22D3EE" />
+    </linearGradient>
+    <linearGradient id="memaBg" x1="10" y1="8" x2="118" y2="124" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827" />
+      <stop offset="1" stop-color="#0B1220" />
+    </linearGradient>
+  </defs>
+
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#memaBg)" />
+
+  <path
+    d="M20 104V24h18l26 38 26-38h18v80H90V57L68 89h-8L38 57v47z"
+    fill="url(#memaGlyph)"
+  />
+
+  <circle cx="100" cy="30" r="10" fill="#F97316" />
 </svg>
+
+sips -s format ico src/app/icon.svg --out src/app/favicon.ico >/dev/null
+sips -z 180 180 src/app/icon.svg --out src/app/apple-icon.png >/dev/null
+ls -la src/app/icon.svg src/app/favicon.ico src/app/apple-icon.png

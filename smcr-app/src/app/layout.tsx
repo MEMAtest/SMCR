@@ -22,10 +22,20 @@ const plexMono = IBM_Plex_Mono({
   variable: "--font-mono",
 });
 
+const ICON_VERSION = "20260220";
+
 export const metadata: Metadata = {
   title: "MEMA Consultants",
   description:
     "Design, evidence, and export Senior Managers & Certification Regime packs with a premium guided experience.",
+  icons: {
+    icon: [
+      { url: `/favicon.ico?v=${ICON_VERSION}`, sizes: "any" },
+      { url: `/icon.svg?v=${ICON_VERSION}`, type: "image/svg+xml" },
+    ],
+    shortcut: [{ url: `/favicon.ico?v=${ICON_VERSION}` }],
+    apple: [{ url: `/apple-icon.png?v=${ICON_VERSION}`, sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
