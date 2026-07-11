@@ -50,6 +50,11 @@ export default function RootLayout({
       >
         <SessionProvider>{children}</SessionProvider>
         <Analytics />
+        <script
+          defer
+          src="https://owned-portfolio-analytics.mema-consultants.workers.dev/tracker.js"
+          data-project="smcr-app"
+        />
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 import type { Individual } from "@/lib/validation";
 import type { PrescribedResponsibility } from "@/lib/smcr-data";
+import { trackOwnedEvent } from "@/lib/owned-analytics";
 
 /**
  * Generates CSV content for the responsibilities matrix
@@ -76,6 +77,7 @@ export function downloadCSV(csvContent: string, filename: string): void {
   // Cleanup
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  trackOwnedEvent("download_completed", { format: "csv", report: "smcr" });
 }
 
 /**

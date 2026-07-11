@@ -1,4 +1,5 @@
 import type { SmcrReportPDFProps } from "./SmcrReportPDF";
+import { trackOwnedEvent } from "@/lib/owned-analytics";
 
 /**
  * Generates an SMCR report PDF blob.
@@ -42,6 +43,7 @@ export async function generateAndDownloadPDF(
   // Cleanup
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  trackOwnedEvent("download_completed", { format: "pdf", report: "smcr" });
 }
 
 /**
