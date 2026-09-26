@@ -115,7 +115,15 @@ export const SorSchema = z.object({
     .default([]),
   /** Latest AI draft awaiting human review. */
   aiDraft: z
-    .object({ text: text(8000), generatedAt: isoDate, model: text(80), acceptedBy: text(200).optional(), acceptedOn: isoDate.optional() })
+    .object({
+      text: text(8000),
+      generatedAt: isoDate,
+      model: text(80),
+      rationale: z.array(text(1000)).max(20).default([]),
+      gaps: z.array(text(1000)).max(20).default([]),
+      acceptedBy: text(200).optional(),
+      acceptedOn: isoDate.optional(),
+    })
     .optional(),
 });
 
