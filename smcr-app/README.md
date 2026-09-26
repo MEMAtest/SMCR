@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# SM&CR Studio
 
-## Getting Started
+A workspace for FCA solo-regulated firms to set up and run the Senior Managers & Certification Regime: firm categorisation, senior managers and prescribed responsibilities, fitness & propriety, Statements of Responsibilities and the responsibilities map, and the year-round registers (certification, Conduct Rules, regulatory references, reasonable steps, handovers) with an obligations calendar. Claude-powered drafting and a handbook assistant are built in.
 
-First, run the development server:
+> The regulatory reference data is a **versioned rules pack** (`src/lib/rules/fca-solo.ts`, currently `fca-solo-2026.09`, reflecting PS26/6). Items that could not be confirmed against the live FCA Handbook are flagged `verify` in the data and shown with a "verify" badge in the UI. Have the pack reviewed by a compliance professional before relying on it.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env   # all settings optional
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Setting | Effect |
+|---|---|
+| none | Fully usable; the workspace is saved in the browser (localStorage). Use **Backup / Import** to move it. |
+| `DATABASE_URL` | Enables **Save to server**, auto-save and shareable links (`/workspace?w=<id>`). Run `npm run db:push` once to create the `workspaces` table. |
+| `ANTHROPIC_API_KEY` | Enables AI SoR drafting, the handbook assistant and gap review. `ANTHROPIC_MODEL` overrides the default model. |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+There is **no login**. A saved workspace is reachable by anyone who has its link (an unguessable UUID); there is no endpoint that lists workspaces. Don't share links beyond the people who should see the data, and note that F&P answers can contain special-category personal data.
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Scripts
 
-## Learn More
+- `npm run dev` / `npm run build` / `npm start`
+- `npm test` — unit tests for categorisation, PR applicability, F&P logic, deadlines and the API
+- `npm run typecheck`, `npm run lint`
+- `npm run db:push` — sync the Drizzle schema (`src/lib/schema.ts`)
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **One document per firm.** `src/lib/workspace/schema.ts` defines the whole workspace as a zod schema. The client store (`src/stores/useWorkspace.ts`, Zustand + immer + persist) holds it; the API stores it as one JSONB row (`/api/workspaces`, `/api/workspaces/[id]`), so every save is atomic and validated.
+- **Rules as data.** `src/lib/rules/fca-solo.ts` holds categories and thresholds, PRs, SMFs, certification functions, Conduct Rules, FIT questions (each with its adverse answer) and deadlines. Update the pack, not the UI, when rules change.
+- **Derived logic.** `src/lib/workspace/derive.ts` (applicable PRs/SMFs, F&P status, SoR model), `health.ts` (gap checks and wizard step validation), `obligations.ts` (dated obligations and `.ics` export).
+- **AI.** `src/app/api/ai/*` calls Claude with the rules pack as grounded context and structured outputs. Personal F&P answers are never sent; AI drafts must be accepted by a named reviewer and are logged.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## Upgrading from the earlier prototype
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+The old `firms` / `individuals` / `responsibilities` / `fitness_assessments` / `certifications` tables are no longer used. `npm run db:push` will offer to drop them; earlier drafts could not be saved reliably, so there is nothing to migrate.
