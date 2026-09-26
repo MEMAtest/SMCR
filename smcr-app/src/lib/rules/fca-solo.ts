@@ -332,8 +332,14 @@ export const PRESCRIBED_RESPONSIBILITIES: PrescribedResponsibility[] = [
   },
 ];
 
+/** Short reference, e.g. "PR (b-1)". Unconfirmed letters show as "PR (tbc)". */
 export function prLabel(pr: PrescribedResponsibility): string {
-  return pr.letter ? `PR (${pr.letter})` : pr.title;
+  return `PR (${pr.letter || "tbc"})`;
+}
+
+/** Reference plus title, e.g. "PR (b-1) Conduct Rules training and reporting". */
+export function prFullLabel(pr: PrescribedResponsibility): string {
+  return `${prLabel(pr)} ${pr.title}`;
 }
 
 export function getPR(id: string): PrescribedResponsibility | undefined {

@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, FIT_SECTIONS, getSmf, RULES_META } from "@/lib/rules/fca-solo";
+import { CATEGORY_LABELS, FIT_SECTIONS, getSmf, prLabel, RULES_META } from "@/lib/rules/fca-solo";
 import {
   activePeople,
   buildSorModel,
@@ -112,7 +112,7 @@ export function buildMrmModel(ws: Workspace): MrmModel {
       const alloc = ws.responsibilities[pr.id];
       const owner = getPerson(ws, alloc?.ownerId);
       return {
-        label: pr.letter ? `PR (${pr.letter})` : "PR",
+        label: prLabel(pr),
         title: pr.title,
         verify: !!pr.verify || !pr.letterConfirmed,
         owner: owner?.name ?? "Unallocated",

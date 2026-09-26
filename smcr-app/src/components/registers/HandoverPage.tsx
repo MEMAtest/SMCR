@@ -19,7 +19,7 @@ import {
   VerifyBadge,
   slugify,
 } from "@/components/ui";
-import { DEADLINES, DEADLINE_SOURCES, getPR, getSmf, prLabel } from "@/lib/rules/fca-solo";
+import { DEADLINES, DEADLINE_SOURCES, getPR, getSmf, prFullLabel, prLabel } from "@/lib/rules/fca-solo";
 import { addBusinessDays, addMonths, formatDate } from "@/lib/workspace/dates";
 import { getPerson, prsHeldBy } from "@/lib/workspace/derive";
 import { getObligations } from "@/lib/workspace/obligations";
@@ -39,7 +39,7 @@ interface PackSection {
 
 function prText(id: string) {
   const pr = getPR(id);
-  return pr ? { label: `${prLabel(pr)} ${pr.title}`, detail: pr.text, verify: !pr.letterConfirmed || !!pr.verify } : { label: id, detail: "", verify: false };
+  return pr ? { label: prFullLabel(pr), detail: pr.text, verify: !pr.letterConfirmed || !!pr.verify } : { label: id, detail: "", verify: false };
 }
 
 function buildPack(ws: Workspace, h: Handover, today: string): { heading: string[]; sections: PackSection[] } {
@@ -475,7 +475,7 @@ export function HandoverPage() {
                   </span>
                 ),
               },
-              { header: "PRs", cell: (h) => (h.prIds.length ? h.prIds.map((id) => getPR(id)?.letter ?? id).join(", ") : "—") },
+              { header: "PRs", cell: (h) => (h.prIds.length ? h.prIds.map((id) => (getPR(id) ? prLabel(getPR(id)!) : id)).join(", ") : "—") },
               { header: "Status", cell: (h) => <Badge tone={h.status === "completed" ? "good" : "warn"}>{h.status === "completed" ? "Completed" : "Draft"}</Badge> },
               {
                 header: "Actions",

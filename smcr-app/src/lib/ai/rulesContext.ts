@@ -131,7 +131,7 @@ function buildSources(): RuleSource[] {
     ].filter(Boolean);
     out.push({
       id: `PR:${pr.id}`,
-      label: `${prLabel(pr)}${pr.letter ? ` ${pr.title}` : ""}`,
+      label: `${prLabel(pr)} ${pr.title}`,
       ref: pr.handbookRef,
       verify,
       text:

@@ -174,19 +174,26 @@ export const useWorkspace = create<WorkspaceStore>()(
 
 let hydrationStarted = false;
 
+/** The persist API only exists in the browser (no localStorage on the server). */
+function persistApi() {
+  return typeof window === "undefined" ? undefined : useWorkspace.persist;
+}
+
 /**
  * Returns true once the persisted workspace has been loaded from localStorage.
  * Render placeholders until then to avoid SSR hydration mismatches.
  */
 export function useHydrated(): boolean {
-  const [hydrated, setHydrated] = useState(() => useWorkspace.persist.hasHydrated());
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
-    const unsub = useWorkspace.persist.onFinishHydration(() => setHydrated(true));
+    const api = persistApi();
+    if (!api) return;
+    const unsub = api.onFinishHydration(() => setHydrated(true));
     if (!hydrationStarted) {
       hydrationStarted = true;
-      void useWorkspace.persist.rehydrate();
+      void api.rehydrate();
     }
-    if (useWorkspace.persist.hasHydrated()) setHydrated(true);
+    if (api.hasHydrated()) setHydrated(true);
     return unsub;
   }, []);
   return hydrated;

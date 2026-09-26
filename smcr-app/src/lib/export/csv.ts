@@ -1,4 +1,4 @@
-import { CERTIFICATION_FUNCTIONS, getSmf } from "@/lib/rules/fca-solo";
+import { CERTIFICATION_FUNCTIONS, getSmf, prLabel } from "@/lib/rules/fca-solo";
 import { activePeople, getPerson, getWorkspacePRs } from "@/lib/workspace/derive";
 import type { Workspace } from "@/lib/workspace/schema";
 
@@ -53,7 +53,7 @@ export function responsibilitiesMatrixCsv(ws: Workspace): string {
     const owner = getPerson(ws, alloc?.ownerId);
     const shared = (alloc?.sharedWithIds ?? []).map((id) => getPerson(ws, id)?.name ?? "Unknown").join("; ");
     return [
-      pr.letter ? `PR (${pr.letter})` : "PR (letter to confirm)",
+      prLabel(pr),
       pr.title,
       pr.text,
       owner?.name ?? "Unallocated",

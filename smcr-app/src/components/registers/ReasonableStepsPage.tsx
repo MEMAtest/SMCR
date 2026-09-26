@@ -18,7 +18,7 @@ import {
   VerifyBadge,
   slugify,
 } from "@/components/ui";
-import { getPR, prLabel } from "@/lib/rules/fca-solo";
+import { getPR, prFullLabel, prLabel } from "@/lib/rules/fca-solo";
 import { addDays, addMonths, formatDate } from "@/lib/workspace/dates";
 import { getPerson, prsHeldBy, smfHolders } from "@/lib/workspace/derive";
 import { newId, type ReasonableStep, type Workspace } from "@/lib/workspace/schema";
@@ -42,7 +42,7 @@ export const STEP_KIND_LABELS: Record<Kind, string> = {
 function prName(id: string | undefined) {
   if (!id) return "General";
   const pr = getPR(id);
-  return pr ? `${prLabel(pr)} ${pr.title}` : id;
+  return pr ? prFullLabel(pr) : id;
 }
 
 function exportPerson(ws: Workspace, personId: string, today: string) {
@@ -104,7 +104,7 @@ function EntryForm({ initial, onSaved, onCancel }: { initial: Draft; onSaved: (m
             <option value="">General / not PR-specific</option>
             {prs.map(({ pr }) => (
               <option key={pr.id} value={pr.id}>
-                {prLabel(pr)} {pr.title}
+                {prFullLabel(pr)}
               </option>
             ))}
             {d.prId && !prs.some(({ pr }) => pr.id === d.prId) && <option value={d.prId}>{prName(d.prId)}</option>}
@@ -276,7 +276,7 @@ export function ReasonableStepsPage() {
                     <div className="flex flex-wrap gap-1">
                       {s.stalePrs.map(({ pr }) => (
                         <Badge key={pr.id} tone="warn">
-                          {prLabel(pr)} {pr.title}
+                          {prFullLabel(pr)}
                           {(pr.verify || !pr.letterConfirmed) && <span className="sr-only"> (verify)</span>}
                         </Badge>
                       ))}

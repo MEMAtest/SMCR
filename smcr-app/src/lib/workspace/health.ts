@@ -1,4 +1,4 @@
-import { CATEGORY_LABELS, EXPECTED_SMFS, getSmf, prLabel } from "@/lib/rules/fca-solo";
+import { CATEGORY_LABELS, EXPECTED_SMFS, getSmf, prFullLabel, prLabel } from "@/lib/rules/fca-solo";
 import {
   activePeople,
   allocationWarnings,
@@ -109,7 +109,7 @@ function responsibilityIssues(ws: Workspace): HealthIssue[] {
     const alloc = ws.responsibilities[pr.id];
     const owner = getPerson(ws, alloc?.ownerId);
     if (!owner) {
-      issues.push({ id: `pr-unowned-${pr.id}`, severity: "blocker", area: "responsibilities", title: `${prLabel(pr)} ${pr.title} has no owner`, href: "/builder?step=responsibilities", handbookRef: pr.handbookRef });
+      issues.push({ id: `pr-unowned-${pr.id}`, severity: "blocker", area: "responsibilities", title: `${prFullLabel(pr)} has no owner`, href: "/builder?step=responsibilities", handbookRef: pr.handbookRef });
       continue;
     }
     for (const [i, w] of allocationWarnings(ws, pr, owner).entries())

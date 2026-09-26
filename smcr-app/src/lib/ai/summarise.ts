@@ -91,7 +91,7 @@ export function buildAskContext(ws: Workspace, today: string): string {
     const alloc = ws.responsibilities[pr.id];
     const owner = alloc?.ownerId ? ws.people.find((p) => p.id === alloc.ownerId) : undefined;
     const shared = (alloc?.sharedWithIds ?? []).map((id) => roleLabel(ws.people.find((p) => p.id === id)));
-    return `- [PR:${pr.id}] ${prLabel(pr)} ${pr.letter ? pr.title : ""}`.trimEnd() +
+    return `- [PR:${pr.id}] ${prLabel(pr)} ${pr.title}`.trimEnd() +
       `: ${owner ? roleLabel(owner) : "UNALLOCATED"}${shared.length ? ` (shared with ${shared.join(", ")})` : ""}`;
   });
 

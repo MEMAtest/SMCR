@@ -1,6 +1,6 @@
 "use client";
 
-import { prLabel, type PrescribedResponsibility } from "@/lib/rules/fca-solo";
+import { prFullLabel, prLabel, type PrescribedResponsibility } from "@/lib/rules/fca-solo";
 import type { Person, Workspace } from "@/lib/workspace/schema";
 import { useWorkspace } from "@/stores/useWorkspace";
 import { Badge, cx } from "@/components/ui";
@@ -78,7 +78,7 @@ export function ResponsibilityMatrix({ ws, prs, holders }: { ws: Workspace; prs:
                             type="button"
                             onClick={() => setPrOwner(pr.id, isOwner ? undefined : h.id)}
                             aria-pressed={isOwner}
-                            aria-label={`${prLabel(pr)} ${pr.title}: ${isOwner ? `owned by ${h.name} — click to unassign` : `assign to ${h.name}`}`}
+                            aria-label={`${prFullLabel(pr)}: ${isOwner ? `owned by ${h.name} — click to unassign` : `assign to ${h.name}`}`}
                             className={cx(
                               "size-8 rounded-lg border text-xs font-semibold transition",
                               isOwner
