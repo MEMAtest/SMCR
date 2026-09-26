@@ -1,146 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, FileText } from "lucide-react";
-import { loadDraft, type DraftData } from "@/lib/services/draftService";
+import { ArrowRight } from "lucide-react";
+import { CATEGORY_LABELS } from "@/lib/rules/fca-solo";
+import { fitnessStatus, getCategory, getWorkspacePRs, peopleNeedingFit, smfHolders } from "@/lib/workspace/derive";
+import { getHealthIssues, healthScore } from "@/lib/workspace/health";
+import { useHydrated, useToday, useWorkspace } from "@/stores/useWorkspace";
 
+const ctaClass =
+  "inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald/90 px-6 py-3 font-semibold text-midnight transition hover:bg-emerald";
+
+/** Reads the workspace saved in this browser and shows a snapshot of it. */
 export function HealthPreview() {
-  const [draftData, setDraftData] = useState<DraftData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [draftId, setDraftId] = useState<string | null>(null);
+  const hydrated = useHydrated();
+  const ws = useWorkspace((s) => s.ws);
+  const today = useToday();
 
-  useEffect(() => {
-    // Check localStorage for recent draft ID
-    const storedDraftId = localStorage.getItem("smcr_current_draft_id");
-    if (storedDraftId) {
-      setDraftId(storedDraftId);
-      loadDraft(storedDraftId).then((result) => {
-        if (result.success && result.data) {
-          setDraftData(result.data);
-        }
-        setLoading(false);
-      });
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
-  // Calculate stats from draft data
-  const stats = draftData
-    ? {
-        assignedCount: Object.values(draftData.responsibilityAssignments).filter(Boolean).length,
-        totalResponsibilities: Object.keys(draftData.responsibilityAssignments).length,
-        ownedCount: Object.entries(draftData.responsibilityOwners).length,
-        individualsCount: draftData.individuals.length,
-        fitnessCompletionPct:
-          draftData.individuals.length > 0
-            ? Math.round(
-                (draftData.fitnessResponses.filter((r) => r.response.trim().length > 0).length /
-                  (draftData.individuals.length * 6)) *
-                  100
-              )
-            : 0,
-      }
-    : null;
-
-  const coverageScore = stats
-    ? stats.assignedCount > 0
-      ? Math.round((stats.ownedCount / stats.assignedCount) * 100)
-      : 0
-    : null;
-
-  if (loading) {
-    return (
-      <div className="glass-panel gradient-border p-8 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-30 blur-3xl bg-plumAccent/40" />
-        <div className="relative z-10 flex items-center justify-center min-h-[400px]">
-          <p className="text-sand/70">Loading draft preview...</p>
-        </div>
-      </div>
-    );
-  }
+  const summary = useMemo(() => {
+    if (!hydrated) return null;
+    const hasWorkspace = !!ws.firm.name.trim() || ws.people.length > 0;
+    if (!hasWorkspace) return { hasWorkspace } as const;
+    const category = getCategory(ws);
+    const prs = getWorkspacePRs(ws);
+    const holders = smfHolders(ws);
+    const owned = prs.filter((pr) => holders.some((h) => h.id === ws.responsibilities[pr.id]?.ownerId)).length;
+    const fitPeople = peopleNeedingFit(ws);
+    const fitDone = fitPeople.filter((p) => fitnessStatus(ws, p.id).complete).length;
+    return {
+      hasWorkspace,
+      category,
+      score: healthScore(getHealthIssues(ws, today)),
+      owned,
+      prCount: prs.length,
+      fitDone,
+      fitCount: fitPeople.length,
+    } as const;
+  }, [hydrated, ws, today]);
 
   return (
-    <div className="glass-panel gradient-border p-8 relative overflow-hidden">
-      <div className="absolute inset-0 opacity-30 blur-3xl bg-plumAccent/40" />
+    <div className="glass-panel gradient-border relative overflow-hidden p-6 sm:p-8">
+      <div className="absolute inset-0 bg-plumAccent/40 opacity-30 blur-3xl" aria-hidden />
       <div className="relative z-10">
-        <div className="flex items-center gap-4 mb-8">
-          <Image
-            src="/mema-mark.svg"
-            alt="MEMA"
-            width={64}
-            height={64}
-            className="rounded-full border border-emerald/40"
-          />
+        <div className="mb-8 flex items-center gap-4">
+          <Image src="/mema-mark.svg" alt="" width={64} height={64} className="rounded-full border border-emerald/40" />
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-cloud/70">MEMA insight</p>
-            <p className="text-2xl font-semibold">SMCR Health Preview</p>
+            <p className="text-sm uppercase tracking-[0.3em] text-cloud/70">Saved in this browser</p>
+            <p className="text-2xl font-semibold">SM&amp;CR health preview</p>
           </div>
         </div>
 
-        {draftData ? (
+        {!summary ? (
+          <div className="min-h-[260px] animate-pulse rounded-2xl bg-white/5" aria-busy="true" aria-label="Loading preview" />
+        ) : !summary.hasWorkspace ? (
           <>
-            <div className="space-y-4 mb-6">
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Coverage score</p>
-                <p className="text-4xl font-semibold text-emerald">{coverageScore}%</p>
-                <p className="text-xs text-sand/70">
-                  {stats!.ownedCount} of {stats!.assignedCount} responsibilities assigned
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Fitness assessment</p>
-                <p className="text-2xl font-semibold">{stats!.fitnessCompletionPct}% complete</p>
-                <p className="text-xs text-sand/70">
-                  {stats!.individualsCount} individual{stats!.individualsCount !== 1 ? "s" : ""} tracked
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Firm profile</p>
-                <p className="text-lg font-semibold">{draftData.firmProfile.firmName || "Unnamed firm"}</p>
-                <p className="text-xs text-sand/70">{draftData.firmProfile.firmType || "Type not set"}</p>
-              </div>
+            <div className="mb-6 space-y-4">
+              <Tile label="Firm" value="—" detail="No workspace in this browser yet" muted />
+              <Tile label="Health score" value="—" detail="Checks run as you complete setup" muted />
+              <Tile label="Category" value="—" detail="Worked out from a few scope questions" muted />
             </div>
-            <Link
-              href={`/builder?draftId=${draftId}`}
-              className="inline-flex items-center justify-center gap-2 w-full rounded-full bg-emerald/90 px-6 py-3 text-midnight font-semibold transition hover:bg-emerald"
-            >
-              <FileText className="size-4" />
-              Continue Draft
-              <ArrowRight className="size-4" />
+            <Link href="/builder" className={ctaClass}>
+              Start setup
+              <ArrowRight className="size-4" aria-hidden />
             </Link>
           </>
         ) : (
           <>
-            <div className="space-y-4 mb-6">
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Coverage score</p>
-                <p className="text-4xl font-semibold text-sand/40">—</p>
-                <p className="text-xs text-sand/70">No active draft</p>
-              </div>
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Fitness assessment</p>
-                <p className="text-2xl font-semibold text-sand/40">—</p>
-                <p className="text-xs text-sand/70">Start a new SMCR journey</p>
-              </div>
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
-                <p className="text-sm text-cloud/80">Firm profile</p>
-                <p className="text-lg font-semibold text-sand/40">—</p>
-                <p className="text-xs text-sand/70">Launch builder to begin</p>
-              </div>
+            <div className="mb-6 space-y-4">
+              <Tile
+                label="Firm"
+                value={ws.firm.name || "Unnamed firm"}
+                detail={summary.category ? `${CATEGORY_LABELS[summary.category]} firm` : "Category not set yet"}
+              />
+              <Tile
+                label="Health score"
+                value={`${summary.score}/100`}
+                detail="Based on the tool's checks — not a statement of compliance"
+                highlight={summary.score >= 80}
+              />
+              <Tile
+                label="Progress"
+                value={summary.category === "limited" ? `${summary.fitDone}/${summary.fitCount} F&P` : `${summary.owned}/${summary.prCount} PRs owned`}
+                detail={summary.category === "limited" ? "assessments complete" : `${summary.fitDone}/${summary.fitCount} F&P assessments complete`}
+              />
             </div>
-            <Link
-              href="/builder"
-              className="inline-flex items-center justify-center gap-2 w-full rounded-full bg-emerald/90 px-6 py-3 text-midnight font-semibold transition hover:bg-emerald"
-            >
-              Launch SMCR Builder
-              <ArrowRight className="size-4" />
+            <Link href="/workspace" className={ctaClass}>
+              Continue
+              <ArrowRight className="size-4" aria-hidden />
             </Link>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function Tile({ label, value, detail, muted, highlight }: { label: string; value: string; detail: string; muted?: boolean; highlight?: boolean }) {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
+      <p className="text-sm text-cloud/80">{label}</p>
+      <p className={`break-words text-2xl font-semibold ${muted ? "text-sand/40" : highlight ? "text-emerald" : "text-sand"}`}>{value}</p>
+      <p className="text-xs text-sand/70">{detail}</p>
     </div>
   );
 }
